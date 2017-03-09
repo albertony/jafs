@@ -230,8 +230,23 @@ namespace JaFS
             var trashData = FetchObject<JFSData.JFSMountPointData>(path);
             return new JFSTrash(this, trashData);
         }
-
-        public JFSFileBase[] GetLatestFiles(int maxResults = 10, string sortBy = "updated")
+        public JFSFileBase[] GetSharedFiles()
+        {
+            // Return list of shared files.
+            // TODO: The list currently includes any deleted shared files also..
+            var path = "/" + BUILTIN_DEVICE_NAME + "/Links";
+            var searchResultData = FetchObject<JFSData.JFSSearchResultData>(path);
+            JFSFileBase[] files = new JFSFile[searchResultData.Files.Length];
+            for (int i = 0; i < searchResultData.Files.Length; i++)
+            {
+                // Creating file object using the FileBase factory method which will decide between JFSFile, JFSIncompleteFile or JFSCorruptFile.
+                // Special case with path here: The data object (JFSSearchResultData) does not have a path that we can use as parent path for
+                // files, but luckily the incomplete file objects contained in the data object have path member (which is the parent path) already.
+                files[i] = JFSFileBase.Create(this, searchResultData.Files[i], false);
+            }
+            return files;
+        }
+        public JFSFileBase[] GetRecentFiles(int maxResults = 10, string sortBy = "updated")
         {
             // Get a list of the n latest files (the server minimum default is 10), optionally sorted.
             // This is a special built-in object on mount point level, appearing as mount point with name "Label",
@@ -1303,7 +1318,7 @@ namespace JaFS
     // devices (which is for the backup feature). The special mount points "Latest" and "Share" are handled by their
     // own specialized classes, since they cannot be used with regular file operations.
     //
-    public class JFSMountPoint : JFSFolderBase<JFSData.JFSMountPointData>
+    public sealed class JFSMountPoint : JFSFolderBase<JFSData.JFSMountPointData>
     {
         public DateTime? Deleted { get { if (Data.Deleted != null) return Data.Deleted.DateTime; return null; } }
         public bool IsDeleted { get { return Deleted != null; } }
@@ -1489,10 +1504,10 @@ namespace JaFS
     //
     public abstract class JFSFileBase : JFSNamedAndPathedObject<JFSData.JFSFileData>
     {
-        System.Net.Mime.ContentType Mime { get; }
-        public bool IsImage { get { return Mime.MediaType == "image"; } } // SUb-classes implements Mime
         public DateTime? Deleted { get { return Data.Deleted; } }
         public bool IsDeleted { get { return Deleted != null; } }
+        public string SharedSecret { get { return Data.PublicURI; } }
+        public bool IsShared{ get { return SharedSecret != null; } }
         public string OriginalParentPath { get { return Data.OriginalPath != null ? FileSystem.ConvertFromDataPath(Data.OriginalPath) + "/" : null; } } // If deleted this contains the full path to the original parent, since ParentPath is the path within Trash. For deleted files this is present also in incomplete data objects
         public string OriginalFullName { get { return OriginalParentPath == null ? null : OriginalParentPath + Name; } } // If deleted this contains the original Full path of this object. Never ending with path separator.
         public Guid GUID { get { return Data.UUID; } }
@@ -1618,6 +1633,7 @@ namespace JaFS
             Large,
             ExtraLarge,
         }
+        public bool IsImage { get { return Mime.MediaType == "image"; } } // SUb-classes implements Mime
         public override ulong RevisionNumber { get { return Data.CurrentRevision.Number; } }
         public override DateTime? Created { get { return Data.CurrentRevision.Created.DateTime; } }
         public override DateTime? Modified { get { return Data.CurrentRevision.Modified.DateTime; } }
@@ -1649,7 +1665,6 @@ namespace JaFS
             // TODO: Is this necessary, and easily possible, with the .NET WebResponse stream?
             throw new NotImplementedException(); // TODO!
         }
-
         public void Write(string filePath)
         {
             // Put, possibly replace, file contents with (new) data.
@@ -1658,32 +1673,16 @@ namespace JaFS
             SetData(newFileData); // Replace existing data object with the new one!
             // NB: Any parent objects (folder) that the client keeps needs to be refreshed for the updated file to be considered (folders keep revision data about files)!
         }
-        public void Share()
+        public void Share(bool enable = true)
         {
             // Enable public access at secret, share only uri, and return that uri.
-            // See JFSEnableSharing object!
-            // See comment in Jottalib: Jottacloud has changed the sharing API. Please use jottacloud.com in a browser, for now.
-            throw new NotImplementedException(); // TODO!
-#if false
-            'Enable public access at secret, share only uri, and return that uri'
-            //This is what jottacloud.com does
-            // HTTP GET to
-            //
-            // https://www.jottacloud.com/web/share/{sync,backup,archive}/list/[folder uuid]/@[base64-encodded basename]?t=[timestamp]
-            //
-            // e.g.
-            // https://www.jottacloud.com/web/share/backup/list/002c7707c2b27604dc4670660961a33a648/@YmzDpWLDpnIudXRmOC50eHQ=?t=1465934084756
-            // https://www.jottacloud.com/web/share/backup/list/002c7707c2b27604dc4670660961a33a648/@YmzDpWLDpnIudXRmOC50eHQ=?t=1465934084756
-            //
-            raise NotImplementedError('Jottacloud has changed the sharing API. Please use jottacloud.com in a browser, for now.')
-            url = 'https://www.jottacloud.com/rest/webrest/%s/action/enableSharing' % self.jfs.username
-            data = {'paths[]':self.path.replace(JFS_ROOT, ''),
-                    'web':'true',
-                    'ts':int(time.time()),
-                    'authToken':0}
-            r = self.jfs.post(url, content=data)
-            return r
-#endif
+            var parameters = new Dictionary<string, string> { { "mode", enable ? "enableShare" : "disableShare" } };
+            var newFileData = FileSystem.FetchObject<JFSData.JFSFileData>(FullName, parameters); // Returns the new JFSFileData, which is complete (and now with or without publicURI on it)!
+            SetData(newFileData); // Replace existing data object with the new one!
+        }
+        public void UnShare()
+        {
+            Share(false);
         }
         public void Restore()
         {

@@ -97,7 +97,6 @@
     </Content>
     <Content Include="TestFiles\MountPointCreatePostResponse.xml" />
     <Content Include="TestFiles\MountPointDeletePermantPostResponse.xml" />
-    <Content Include="TestFiles\MountPointPermanentDeletePostResponse - Copy.xml" />
     <Content Include="TestFiles\SearchResult.xml" />
     <Content Include="TestFiles\Trash.xml" />
     <Content Include="TestFiles\User.xml" />
