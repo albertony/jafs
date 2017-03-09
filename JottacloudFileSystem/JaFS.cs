@@ -1259,16 +1259,20 @@ namespace JaFS
             // Upload a file to current folder and return the new JFSFile
             FileInfo fileInfo = new FileInfo(filePath);
             string jfsPath = FullName + "/" + fileInfo.Name;
-            //var newFileData = FileSystem.UploadMultipart(jfsPath, fileInfo); // Returns the new JFSFileData, which is not complete because it often misses the path element event!?
-            //var fileObject = JFSFileBase.Create(FileSystem, newFileData, true;
+
+            var newFileData = FileSystem.UploadMultipart(jfsPath, fileInfo); // Returns the new JFSFileData, which is not complete because it often misses the path element event!?
+
+            /*
+            For testing different upload methods!
             JFSData.JFSFileData newFileData = null;
             newFileData = FileSystem.UploadSimple(jfsPath, fileInfo, 0, true);
             newFileData = FileSystem.UploadSimple(jfsPath, fileInfo, 0, false);
             newFileData = FileSystem.UploadMultipart(jfsPath, fileInfo, 0, true);
             newFileData = FileSystem.UploadMultipart(jfsPath, fileInfo, 0, true);
             //newFileData = FileSystem.UploadIfNotAlreadyExists(jfsPath, fileInfo); break;
-                   
-            var fileObject = JFSFileBase.Create(FileSystem, FullName, newFileData); // Cannot trust path being present in returned file data!
+            */
+
+            var fileObject = JFSFileBase.Create(FileSystem, FullName, newFileData);  // Cannot trust path being present in returned file data!
             if (FileSystem.AutoFetchCompleteData)
                 FetchCompleteData(); // Re-load the current (parent) folder for the updated file to be considered (folders keep revision data about files)?
             return fileObject;

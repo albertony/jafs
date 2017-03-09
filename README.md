@@ -7,7 +7,7 @@ company Jotta AS.
 
 Jotta AS is a Norwegian company that operates under Norwegian jurisdiction, safe from *USA PATRIOT Act*
 and with a [privacy guarantee](https://blog.jottacloud.com/its-your-stuff-guaranteed-3f50359f72d).
-This, together with their ulimited storage option, they have an appealing offer in the crowded
+This, together with their ulimited storage option, make them have an appealing offer in the crowded
 market of cloud service providers.
 
 Disclaimer
@@ -108,7 +108,8 @@ will show up in the backup section in the official web interface. Whether you ca
 devies depends on your account type. Unlimited accounts can have an unlimited number of devices.
 
 JaFS support creation of new devices and deleting devices. Note that deleting a device is always
-permanent, it will not be moved to trash with the possibility for restoring it later.
+permanent, it will not be moved to trash with the possibility for restoring it later. Renaming
+of devices are not supported yet.
 
 #### Mount points
 
@@ -135,7 +136,7 @@ also allowed to create new mount points also for the built-in device, but these 
 not be shown in the official web user interface so you must be a bit careful with this.
 
 Custom mount points can be deleted, and will then be moved to trash (will look like a folder
-in the web user interface). You can also delete them permanently.
+in the web user interface). You can also delete them permanently. Rename/move is not supported yet.
 
 As mentioned above; mount points are more or less just folders (except the special ones),
 and they contain lists of folders (sub-folders) and files (files can be stored directly on
@@ -144,20 +145,24 @@ counting the total storage used by the mount point, this information is not on r
 
 #### Folders
 
-Folders contain lists of folders (sub-folders) and files. Not very surprising.
+Folders contain lists of folders (sub-folders) and files. Not very surprising. You can create
+new folders, rename/move them, delete them into trash or delete them permanently.
 
 #### Files
 
-Files are stored in folders (or mount points).
+Files are stored in folders (or mount points). You create files by uploading a local file
+into a specified path. You can also rename/move files, delete them into trash or delete
+them permanently.
 
 Limitations
 ===========
 
 Some of the functions that are not implemented yet:
 * Correct handling of any kind of issues that can occur during file upload.
-* Resume of incomplete files.
+* Handling of file versions.
+* Resume upload of incomplete files.
 * Restore deleted items from trash.
-* Rename/move mount points.
+* Rename mount points.
 * Rename of devices.
 * Sharing of files by giving public access using a secret.
 
