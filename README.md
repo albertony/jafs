@@ -46,6 +46,8 @@ Please add anything you find to the [bug tracker](https://github.com/albertony/j
 
 The REST API is shared with the various whitelabel products like [Get Sky](https://sky.get.no),
 [Elkjøp Cloud](https://cloud.elkjop.no) etc so this library should also work for them.
+Please let me know if you have tried on any such products, so I can gather a list of what
+works and what doesn't (just add a [issue](https://github.com/albertony/jafs/issues) or something).
 
 Installation
 ============

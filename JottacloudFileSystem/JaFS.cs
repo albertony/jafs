@@ -694,6 +694,7 @@ namespace JaFS
                     { "JCreated", timeCreated },
                     { "JModified", timeModified },
                     { "JSize", fileSize.ToString() },
+                    // The following are used by havardgulldahl/jottalib but does not seem to be mandatory.
                     //{ "X-Jfs-DeviceName", deviceName },
                     //{ "jx_csid", "" },
                     //{ "jx_lisence", "" },
@@ -911,7 +912,7 @@ namespace JaFS
 
         // Some special considerations for mount points of the built-in device
         public enum BuiltInMountPoints { Archive, Sync } // All mount points that the Jottacloud's API treat as mount points, including the special ones, but excluding any user created mount points (which is only possible via API?)!
-        public enum SpecialBuiltInMountPoints { Shared, Latest } // These are returned as mount points in the API, but they are special in the sense that you for instance cannot create folders and upload files to them, so we handle them with special classes in our library and not as mount points!
+        public enum SpecialBuiltInMountPoints { Trash, Links, Shared, Latest } // These are returned as mount points in the API ("Trash" and "Links" are not listed as mount points on device object but exists when requesting them directly), but they are special in the sense that you for instance cannot create folders and upload files to them, so we handle them with special classes in our library and not as mount points!
         private bool IsMountPoint(string name) { return !IsSpecialBuiltinMountPoint(name); } // This is true for all that we in this library treat as mount points: The regular built-in mount points and any user created mount points, but not the built-in special mount points (those are handled as specific types in this library).
         private bool IsCustomMountPoint(string name) { return !IsBuiltInDevice || !IsBuiltinMountPoint(name); }
         private bool IsBuiltinMountPoint(string name)
