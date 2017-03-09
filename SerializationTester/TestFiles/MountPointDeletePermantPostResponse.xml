@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <device time="2017-03-08-T21:16:06Z" host="dn-092">
-  <name xml:space="preserve">PCAON</name>
-  <display_name xml:space="preserve">PCAON</display_name>
+  <name xml:space="preserve">PC01</name>
+  <display_name xml:space="preserve">PC01</display_name>
   <type>WORKSTATION</type>
   <sid>1ded87e0-4eab-42b4-a5ca-f39071a0abed</sid>
   <size>0</size>

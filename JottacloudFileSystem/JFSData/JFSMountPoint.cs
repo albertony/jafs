@@ -12,7 +12,6 @@ namespace JFSData
     [XmlRoot(ElementName = "mountPoint", Namespace = "", IsNullable = false)]
     public partial class JFSMountPointData : JFSFolderBaseData
     {
-
         // First the basic attributes that are also filled for devices referred to from the JFSUser object.
 
         [XmlElement("name")]
@@ -38,8 +37,11 @@ namespace JFSData
         [XmlIgnore()]
         public override string Path { get { return PathData.String; } } // Implementation of JFSNamedAndPathedRootObjectData
 
-        [XmlElement("abspath")]
-        public JFSDataStringWithWhiteSpaceHandling AbsolutePathData { get; set; }
+        [XmlElement("abspath")] // For deleted folders that are in trash this will contain the original location, while path is the location within trash. For files not in trash this is identical to path.
+        public JFSDataStringWithWhiteSpaceHandling OriginalPathData { get; set; }
+
+        [XmlIgnore()]
+        public override string OriginalPath { get { return OriginalPathData.String; } } // Implementation of JFSNamedAndPathedRootObjectData
 
         [XmlElement("user")]
         public string User { get; set; }

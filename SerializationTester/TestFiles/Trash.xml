@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mountPoint time="2017-03-09-T13:12:54Z" host="dn-094">
+  <name xml:space="preserve">Trash</name>
+  <path xml:space="preserve">/user01/Jotta</path>
+  <abspath xml:space="preserve">/user01/Jotta</abspath>
+  <size></size>
+  <modified></modified>
+  <device>Jotta</device>
+  <user>user01</user>
+  <folders>
+    <folder name="Archive" deleted="2017-03-04-T19:09:21Z" contextType="TRASH">
+      <abspath xml:space="preserve">/user01/Jotta/Archive</abspath>
+    </folder>
+    <folder name="AsusWRT" deleted="2017-03-09-T11:40:28Z" contextType="TRASH">
+      <abspath xml:space="preserve">/user01/PC01</abspath>
+    </folder>
+    <folder name="Duplicati" deleted="2017-03-06-T12:49:38Z" contextType="TRASH">
+      <abspath xml:space="preserve">/user01/Jotta/Archive</abspath>
+    </folder>
+    <folder name="Duplicati" deleted="2017-03-06-T12:49:13Z" contextType="TRASH">
+      <abspath xml:space="preserve">/user01/Jotta/Sync</abspath>
+    </folder>
+    <folder name="NewSubfolder" deleted="2017-03-04-T09:44:04Z" contextType="TRASH">
+      <abspath xml:space="preserve">/user01/Jotta/Archive/Test</abspath>
+    </folder>
+    <folder name="NewSubfolder" deleted="2017-03-04-T17:41:26Z" contextType="TRASH">
+      <abspath xml:space="preserve">/user01/Jotta/Sync</abspath>
+    </folder>
+    <folder name="src" deleted="2017-03-09-T12:03:17Z" contextType="TRASH">
+      <abspath xml:space="preserve">/user01/PC01</abspath>
+    </folder>
+    <folder name="Temp01" deleted="2017-03-07-T23:41:56Z" contextType="TRASH">
+      <abspath xml:space="preserve">/user01/Jotta/Archive</abspath>
+    </folder>
+  </folders>
+  <files>
+    <file name="cli.py" uuid="3d5fbee8-66b7-4409-a144-7eb080ea50c3" deleted="2017-03-07-T16:27:51Z" contextType="TRASH">
+      <abspath xml:space="preserve">/user01/Jotta/Archive/Test</abspath>
+      <currentRevision>
+        <number>2</number>
+        <state>COMPLETED</state>
+        <created>2017-03-02-T10:37:01Z</created>
+        <modified>2017-03-02-T10:37:01Z</modified>
+        <mime>application/octet-stream</mime>
+        <mstyle>application/octet-stream</mstyle>
+        <size>28596</size>
+        <md5>d096034802e8d041b5b1739470594be4</md5>
+        <updated>2017-03-02-T10:37:02Z</updated>
+      </currentRevision>
+    </file>
+    <file name="jottacloud_renamed.py" uuid="07d52b07-2cdf-4e72-9ff3-349053b58352" deleted="2017-03-08-T19:55:01Z" contextType="TRASH">
+      <abspath xml:space="preserve">/user01/Jotta/Archive/Test</abspath>
+      <currentRevision>
+        <number>1</number>
+        <state>COMPLETED</state>
+        <created>2017-03-02-T10:28:17Z</created>
+        <modified>2017-03-02-T10:28:17Z</modified>
+        <mime>application/octet-stream</mime>
+        <mstyle>application/octet-stream</mstyle>
+        <size>12512</size>
+        <md5>f3379ef78d5484c1286f92ec8f62b555</md5>
+        <updated>2017-03-02-T10:28:18Z</updated>
+      </currentRevision>
+    </file>
+    <file name="qt.py" uuid="d910a612-9df0-4cde-ac77-e55b8c8cd96d" deleted="2017-03-04-T19:27:09Z" contextType="TRASH">
+      <abspath xml:space="preserve">/user01/Jotta/Archive/Test</abspath>
+      <currentRevision>
+        <number>1</number>
+        <state>COMPLETED</state>
+        <created>2017-03-02-T10:28:16Z</created>
+        <modified>2017-03-02-T10:28:16Z</modified>
+        <mime>application/octet-stream</mime>
+        <mstyle>application/octet-stream</mstyle>
+        <size>6449</size>
+        <md5>5af38bcd1ac7e69e42495a65cb6ff94d</md5>
+        <updated>2017-03-02-T10:28:16Z</updated>
+      </currentRevision>
+    </file>
+  </files>
+  <metadata first="" max="" total="11" num_folders="8" num_files="3"/>
+</mountPoint>

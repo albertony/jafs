@@ -35,6 +35,10 @@ namespace JFSData
     {
         [XmlIgnore()]
         public abstract string Path { get; }
+
+        [XmlIgnore()]
+        public abstract string OriginalPath { get; }
+
     }
 
     //

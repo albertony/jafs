@@ -223,6 +223,14 @@ namespace JaFS
             }
             return null;
         }
+
+        public JFSTrash GetTrash()
+        {
+            var path = "/" + BUILTIN_DEVICE_NAME + "/Trash";
+            var trashData = FetchObject<JFSData.JFSMountPointData>(path);
+            return new JFSTrash(this, trashData);
+        }
+
         public JFSFileBase[] GetLatestFiles(int maxResults = 10, string sortBy = "updated")
         {
             // Get a list of the n latest files (the server minimum default is 10), optionally sorted.
@@ -250,10 +258,12 @@ namespace JaFS
         }
         public string ConvertFromDataPath(string dataPath)
         {
+            if (dataPath == null) return null;
             return dataPath.Substring(RootName.Length + 1); // Paths in data objects start with username, paths in our JFS library has user object as root and keep paths relative to that, so we remove the "[username]/" prefix from the data path.
         }
         public string ConvertToDataPath(string path)
         {
+            if (path == null) return null;
             if (string.IsNullOrEmpty(path) || path == "/")
                 return "/" + RootName; // Fetching the root object itself
             else
@@ -881,7 +891,7 @@ namespace JaFS
             base.SetData(data, isComplete);
             if (isComplete)
             {
-                ParentPath = FileSystem.ConvertFromDataPath(Data.Path) + "/"; ;
+                ParentPath = FileSystem.ConvertFromDataPath(Data.Path) + "/";
             }
         }
         public JFSNamedAndPathedObject(Jottacloud fileSystem, DataObjectType dataWithpath, bool isCompleteData)
@@ -1093,6 +1103,8 @@ namespace JaFS
     //
     public abstract class JFSFolderBase<DataObjectType> : JFSNamedAndPathedObject<DataObjectType> where DataObjectType : JFSData.JFSFolderBaseData
     {
+        public string OriginalParentPath { get { return Data.OriginalPath != null ? FileSystem.ConvertFromDataPath(Data.OriginalPath) + "/" : null; } } // If deleted this contains the full path to the original parent, since ParentPath is the path within Trash. For deleted folders this is present also in incomplete data objects
+        public string OriginalFullName { get { return OriginalParentPath == null ? null : OriginalParentPath + Name; } } // If deleted this contains the original Full path of this object. Never ending with path separator.
         public JFSFolderBase(Jottacloud fileSystem, DataObjectType dataWithPath, bool isCompleteData) : base(fileSystem, dataWithPath, isCompleteData) { }
         public JFSFolderBase(Jottacloud fileSystem, string parentFullName, DataObjectType incompleteDataWithoutPath) : base(fileSystem, parentFullName, incompleteDataWithoutPath) { }
         public JFSFileBase[] GetFiles(bool includeDeleted = false)
@@ -1121,7 +1133,7 @@ namespace JaFS
                 if (includeDeleted || Data.Folders[i].Deleted == null)
                     folders[counter++] = new JFSFolder(FileSystem, FullName, Data.Folders[i]);
             }
-            if (counter != (int)Data.Metadata.NumberOfFiles)
+            if (counter != (int)Data.Metadata.NumberOfFolders)
                 Array.Resize(ref folders, counter);
             return folders;
         }
@@ -1219,7 +1231,7 @@ namespace JaFS
             }
             return fileTree;
         }
-        public JFSFolder NewFolder(string nameOrSubfolderPath)
+        public virtual JFSFolder NewFolder(string nameOrSubfolderPath)
         {
             // Create a new sub-folder and return the new JFSFolder.
             // NB: Input can be name of subfolder, or a path relative to the current folder in which case all intermediate folders along the way will also be created.
@@ -1231,7 +1243,12 @@ namespace JaFS
                 FetchCompleteData(); // Re-load the current (parent) folder also, so that it includes information about the new sub-folder?
             return new JFSFolder(FileSystem, newFolderData, true); // NB: We indicate it is complete, although it does not have the metadata child element which it has in result from GET request!
         }
-        public void DeleteFolderPermanently(string name)
+        public abstract void Delete();
+        public void Restore()
+        {
+            throw new NotImplementedException(); // TODO!
+        }
+        public virtual void DeleteFolderPermanently(string name)
         {
             // Delete filer or folder permanently, without possibility to restore from trash!
             var parameters = new Dictionary<string, string> { { "rmDir", "true" } };
@@ -1243,7 +1260,7 @@ namespace JaFS
         {
             DeleteFolderPermanently(folder.Name);
         }
-        public void DeleteFilePermanently(string name)
+        public virtual void DeleteFilePermanently(string name)
         {
             // Delete filer or folder permanently, without possibility to restore from trash!
             var parameters = new Dictionary<string, string> { { "rm", "true" } };
@@ -1255,12 +1272,11 @@ namespace JaFS
         {
             DeleteFilePermanently(file.Name);
         }
-        public JFSFileBase UploadFile(string filePath, int TESTING = 1)
+        public virtual JFSFileBase UploadFile(string filePath, int TESTING = 1)
         {
             // Upload a file to current folder and return the new JFSFile
             FileInfo fileInfo = new FileInfo(filePath);
             string jfsPath = FullName + "/" + fileInfo.Name;
-
             var newFileData = FileSystem.UploadMultipart(jfsPath, fileInfo); // Returns the new JFSFileData, which is not complete because it often misses the path element event!?
 
             /*
@@ -1287,7 +1303,7 @@ namespace JaFS
     // devices (which is for the backup feature). The special mount points "Latest" and "Share" are handled by their
     // own specialized classes, since they cannot be used with regular file operations.
     //
-    public sealed class JFSMountPoint : JFSFolderBase<JFSData.JFSMountPointData>
+    public class JFSMountPoint : JFSFolderBase<JFSData.JFSMountPointData>
     {
         public DateTime? Deleted { get { if (Data.Deleted != null) return Data.Deleted.DateTime; return null; } }
         public bool IsDeleted { get { return Deleted != null; } }
@@ -1298,7 +1314,7 @@ namespace JaFS
         public string UserName { get { return Data.User; } } // Only in complete data
         public JFSMountPoint(Jottacloud fileSystem, JFSData.JFSMountPointData dataWithPath, bool isCompleteData) : base(fileSystem, dataWithPath, isCompleteData) {}
         public JFSMountPoint(Jottacloud fileSystem, string parentFullName, JFSData.JFSMountPointData incompleteDataWithoutPath) : base(fileSystem, parentFullName, incompleteDataWithoutPath) { }
-        public void Delete()
+        public override void Delete()
         {
             // Delete this mount point and return a deleted JFSMountPoint.
             var parameters = new Dictionary<string, string> { { "dl", "true" } };
@@ -1311,6 +1327,115 @@ namespace JaFS
             throw new InvalidOperationException("Permanent deletion must be done from the parent object!");
         }
         // TODO: Rename, Move, Restore, etc? Don't know if it is possible on mount points. For move, tried both "mv" and "mvDir", but does not work (but when moving files/folders we can move them between mount points!)
+    }
+
+    //
+    // Trash is a mount point object in the REST API, but it has some special aspects so we specialize it.
+    // One thing is that when mount points are deleted they are moved to the trash mount point and listed
+    // as folders, while when we request complete information about we get mount point data object!
+    // Also delete/restore are special for the trash folder!
+    //
+    public sealed class JFSTrash : JFSNamedAndPathedObject<JFSData.JFSMountPointData>
+    {
+        public JFSTrash(Jottacloud fileSystem, JFSData.JFSMountPointData completeData) : base(fileSystem, completeData, true) {} // Since trash is not listed on device, we always have to fetch it directly - and then data is always complete!
+        public JFSFileBase[] GetFiles()
+        {
+            CheckCompleteData();
+            JFSFileBase[] files = new JFSFileBase[Data.Metadata.NumberOfFiles];
+            for (ulong i = 0; i < Data.Metadata.NumberOfFiles; i++)
+            {
+                files[i] = JFSFileBase.Create(FileSystem, FullName, Data.Files[i]); // FileBase factory method will decide between JFSFile, JFSIncompleteFile or JFSCorruptFile!
+            }
+            return files;
+        }
+        public JFSFolder[] GetFolders()
+        {
+            CheckCompleteData();
+            JFSFolder[] folders = new JFSFolder[Data.Metadata.NumberOfFolders];
+            int counter = 0;
+            for (ulong i = 0; i < Data.Metadata.NumberOfFolders; i++)
+            {
+                if (!IsMountPointDataObject(Data.Folders[i])) // Skip objects listed in "folders" that are actually mount points!
+                    folders[counter++] = new JFSFolder(FileSystem, FullName, Data.Folders[i]);
+            }
+            if (counter != (int)Data.Metadata.NumberOfFolders)
+                Array.Resize(ref folders, counter);
+            return folders;
+        }
+        public JFSMountPoint[] GetMountPoints()
+        {
+            CheckCompleteData();
+            JFSMountPoint[] mountPoints = new JFSMountPoint[Data.Metadata.NumberOfFolders];
+            int counter = 0;
+            for (ulong i = 0; i < Data.Metadata.NumberOfFolders; i++)
+            {
+                if (IsMountPointDataObject(Data.Folders[i])) // Include only objects listed in "folders" that are actually mount points!
+                    mountPoints[counter++] = new JFSMountPoint(FileSystem, FullName, ConvertToMountPointDataObject(Data.Folders[i]));
+            }
+            if (counter != (int)Data.Metadata.NumberOfFolders)
+                Array.Resize(ref mountPoints, counter);
+            return mountPoints;
+        }
+        public JFSFileBase GetFile(string name)
+        {
+            // Deleted files that are still in the trash are not returned by default, but argument includeDeleted can be used to include them.
+            CheckCompleteData();
+            for (ulong i = 0; i < Data.Metadata.NumberOfFiles; i++)
+            {
+                if (Data.Files[i].Name == name) // TODO: Check case insensitive?
+                {
+                    return JFSFileBase.Create(FileSystem, FullName, Data.Files[i]); // FileBase factory method will decide between JFSFile, JFSIncompleteFile or JFSCorruptFile!
+                }
+            }
+            return null;
+        }
+        public JFSFolder GetFolder(string name)
+        {
+            // Deleted folders that are still in the trash are not returned by default, but argument includeDeleted can be used to include them.
+            CheckCompleteData();
+            for (ulong i = 0; i < Data.Metadata.NumberOfFolders; i++)
+            {
+                if (Data.Folders[i].Name == name) // TODO: Check case insensitive?
+                {
+                    if (!IsMountPointDataObject(Data.Folders[i])) // Skip objects listed in "folders" that are actually mount points!
+                        return new JFSFolder(FileSystem, FullName, Data.Folders[i]);
+                    else
+                        return null;
+                }
+            }
+            return null;
+        }
+        public JFSMountPoint GetMountPoint(string name)
+        {
+            // Deleted folders that are still in the trash are not returned by default, but argument includeDeleted can be used to include them.
+            CheckCompleteData();
+            for (ulong i = 0; i < Data.Metadata.NumberOfFolders; i++)
+            {
+                if (Data.Folders[i].Name == name) // TODO: Check case insensitive?
+                {
+                    if (Data.Folders[i].OriginalPath == "/" + Data.User + "/" + Data.Device) // Include only objects listed in "folders" that are actually mount points!
+                        new JFSMountPoint(FileSystem, FullName, ConvertToMountPointDataObject(Data.Folders[i]));
+                    else
+                        return null;
+                }
+            }
+            return null;
+        }
+        private bool IsMountPointDataObject(JFSData.JFSFolderData folderData)
+        {
+            // Return true if abspath in data object is /[user]/[device] (and name is [mountpoint])
+            return FileSystem.ConvertFromDataPath(folderData.OriginalPath).IndexOf("/", 1) == -1; // Trim off "/[user]" leaving "/[device]", and then check if there is more than the initial "/" present!
+        }
+        private JFSData.JFSMountPointData ConvertToMountPointDataObject(JFSData.JFSFolderData folderData)
+        {
+            // Convert from JFSFolderData to JFSMountPointData
+            return new JFSData.JFSMountPointData()
+            {
+                NameData = new JFSData.JFSDataStringWithWhiteSpaceHandling() { Space = "preserve", String = folderData.Name },
+                Deleted = new JFSData.JFSDataDateTime() { String = folderData.DeletedString },
+                OriginalPathData = new JFSData.JFSDataStringWithWhiteSpaceHandling() { Space = folderData.OriginalPathData.Space, String = folderData.OriginalPathData.String }
+            };
+        }
     }
 
     public sealed class JFSFolder : JFSFolderBase<JFSData.JFSFolderData>
@@ -1341,8 +1466,12 @@ namespace JaFS
             // Rename folder to a new name, or a path relative to the current folder in which case all intermediate folders along the way will also be created.
             Move(ParentPath + newName); // Same parent but different name, and convert to data path, appending the file system root name (username).
         }
-        public void Delete()
+        public override void Delete()
         {
+            if (IsDeleted)
+            {
+                throw new NotImplementedException("Deleting folders from Trash not supported yet!");
+            }
             // Delete this folder and return a deleted JFSFolder.
             var parameters = new Dictionary<string, string> { { "dlDir", "true" } };
             var newFolderData = FileSystem.Post<JFSData.JFSFolderData>(FullName, parameters); // Returns the deleted JFSFolderData, which is complete (and now with a deleted timestamp on it)!
@@ -1352,44 +1481,6 @@ namespace JaFS
         public void DeletePermanently()
         {
             throw new InvalidOperationException("Permanent deletion must be done from the parent object!");
-        }
-        public JFSFolder Restore()
-        {
-            // Restore (undelete) the folder by bringing it back from the trash.
-            // NB: havardgulldahl/jottalib used a special Web API, and according to discussions it stopped working since january 2016,
-            // see: https://github.com/havardgulldahl/jottalib/issues/74.
-            // But could an alternative be to lookup the folders and files marked as deleted in the REST API,
-            // and restore them in that way??
-            throw new NotImplementedException();
-#if false
-            // TODO: Consider the following comment in jottalib:
-            // As of 2016-06-15, Jottacloud.com has changed their restore api
-            // To restore, this is what's done:
-            //
-            // HTTP POST to https://www.jottacloud.com/web/restore/trash/list
-            // Data:
-            // hash:undefined
-            // files:@0025d37be5329a18eece18dd93f793509e8_dGVzdF9kZWxldGUudHh0
-            // 
-            // where `files` is a comma separated list, and each item is constructed thus:
-            // @<uuid of path>_<base64 encoded file name>
-            // 
-            if (!IsDeleted)
-            {
-                throw new InvalidOperationException("Tried to restore a not deleted folder!");
-            }
-            string url = "https://www.jottacloud.com/rest/webrest/" + FileSystem.Root.Name + "/action/restore";
-            var epochTime = (int)(DateTime.UtcNow - new DateTime(1970, 1, 1)).TotalSeconds;
-            var data = new Dictionary<string, string> {
-                { "paths[]", Path.Replace(Jottacloud.JFS_PATH, "") },
-                { "web", "true" },
-                { "ts", string.Format("%d",epochTime) },
-                { "authToken", "0" }
-            };
-            var folderData = FileSystem.Post<JFSData.JFSFolderData>(Path, null, null, data); // Returns the new JFSFolderData (seems to be incomplete?)
-            FetchCompleteData(); // Re-load the existing folder representation also, so that it gets the information that it is no longer deleted!
-            return new JFSFolder(FileSystem, Path, folderData, false); // TODO: Or just return "this"?
-#endif
         }
     }
 
@@ -1402,6 +1493,8 @@ namespace JaFS
         public bool IsImage { get { return Mime.MediaType == "image"; } } // SUb-classes implements Mime
         public DateTime? Deleted { get { return Data.Deleted; } }
         public bool IsDeleted { get { return Deleted != null; } }
+        public string OriginalParentPath { get { return Data.OriginalPath != null ? FileSystem.ConvertFromDataPath(Data.OriginalPath) + "/" : null; } } // If deleted this contains the full path to the original parent, since ParentPath is the path within Trash. For deleted files this is present also in incomplete data objects
+        public string OriginalFullName { get { return OriginalParentPath == null ? null : OriginalParentPath + Name; } } // If deleted this contains the original Full path of this object. Never ending with path separator.
         public Guid GUID { get { return Data.UUID; } }
         protected override string CreateChildPath(string childName) { throw new InvalidOperationException(); } // Not supported for files!
         public JFSFileBase(Jottacloud fileSystem, JFSData.JFSFileData dataWithPath, bool isCompleteData) : base(fileSystem, dataWithPath, isCompleteData) { }

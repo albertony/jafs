@@ -91,6 +91,7 @@
     <Content Include="TestFiles\FileUploadPostResponseUpdateSuccess2.xml" />
     <Content Include="TestFiles\Folder.xml" />
     <Content Include="TestFiles\FolderDeleted.xml" />
+    <Content Include="TestFiles\Links.xml" />
     <Content Include="TestFiles\MountPoint.xml">
       <SubType>Designer</SubType>
     </Content>
@@ -98,6 +99,7 @@
     <Content Include="TestFiles\MountPointDeletePermantPostResponse.xml" />
     <Content Include="TestFiles\MountPointPermanentDeletePostResponse - Copy.xml" />
     <Content Include="TestFiles\SearchResult.xml" />
+    <Content Include="TestFiles\Trash.xml" />
     <Content Include="TestFiles\User.xml" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

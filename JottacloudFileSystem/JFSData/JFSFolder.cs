@@ -28,14 +28,21 @@ namespace JFSData
             }
         }
 
+        [XmlAttribute("contextType")] // When it is deleted but is in trash it will have attribute contextType="TRASH"
+        public string ContextType { get; set; }
+
         [XmlElement("path")]
         public JFSDataStringWithWhiteSpaceHandling PathData { get; set; }
 
         [XmlIgnore()]
         public override string Path { get { return PathData.String; } } // Implementation of JFSNamedAndPathedRootObjectData
 
-        [XmlElement("abspath")]
-        public JFSDataStringWithWhiteSpaceHandling AbsolutePathData { get; set; }
+        [XmlElement("abspath")] // For deleted folders that are in trash this will contain the original location, while path is the location within trash. For files not in trash this is identical to path.
+        public JFSDataStringWithWhiteSpaceHandling OriginalPathData { get; set; }
+
+        [XmlIgnore()]
+        public override string OriginalPath { get { return OriginalPathData.String; } } // Implementation of JFSNamedAndPathedRootObjectData
+
     }
 
     [Serializable()]

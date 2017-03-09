@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<searchresult time="2017-03-09-T13:25:32Z" host="dn-099">
+  <files>
+    <file name="Makefile.in" uuid="edef05c6-d8f9-4a7a-a38f-90d3bdaf962e" deleted="2017-03-09-T12:03:17Z">
+      <path xml:space="preserve">/user01/PC01/src</path>
+      <abspath xml:space="preserve">/user01/PC01/src</abspath>
+      <publicURI>72223339696d45c7b607fae02e0fc3b7</publicURI>
+      <currentRevision>
+        <number>1</number>
+        <state>COMPLETED</state>
+        <created>2016-07-27-T20:25:10Z</created>
+        <modified>2017-02-06-T11:33:15Z</modified>
+        <mime>application/octet-stream</mime>
+        <mstyle>application/octet-stream</mstyle>
+        <size>977907</size>
+        <md5>1c0ad9cfc24f5a5ce512f0c85e587555</md5>
+        <updated>2017-03-09-T11:48:21Z</updated>
+      </currentRevision>
+    </file>
+    <file name="Makefile.am" uuid="6e9bfef5-2d7a-4ad8-ad9f-4afe1c6a4380" deleted="2017-03-09-T12:03:17Z">
+      <path xml:space="preserve">/user01/PC01/src</path>
+      <abspath xml:space="preserve">/user01/PC01/src</abspath>
+      <publicURI>6e96bd558b8e456d8b11870672e9e6cb</publicURI>
+      <currentRevision>
+        <number>1</number>
+        <state>COMPLETED</state>
+        <created>2016-07-27-T20:24:58Z</created>
+        <modified>2017-02-06-T11:33:15Z</modified>
+        <mime>application/octet-stream</mime>
+        <mstyle>application/octet-stream</mstyle>
+        <size>51320</size>
+        <md5>2193ba6477e75b4e5a19547c2833d2ae</md5>
+        <updated>2017-03-09-T11:48:21Z</updated>
+      </currentRevision>
+    </file>
+    <file name="Changelog.txt" uuid="ccdc5765-7238-4f74-adfc-8b7900bb6fbd" deleted="2017-03-09-T11:40:28Z">
+      <path xml:space="preserve">/user01/PC01/AsusWRT</path>
+      <abspath xml:space="preserve">/user01/PC01/AsusWRT</abspath>
+      <publicURI>afa4de51d674496db4fd5f9e570d2498</publicURI>
+      <currentRevision>
+        <number>1</number>
+        <state>COMPLETED</state>
+        <created>2016-09-07-T12:08:51Z</created>
+        <modified>2016-08-05-T01:12:37Z</modified>
+        <mime>text/plain</mime>
+        <mstyle>text/plain</mstyle>
+        <size>123456</size>
+        <md5>e926b5ad94a296de29a67708f7e5ab9f</md5>
+        <updated>2017-03-09-T08:58:37Z</updated>
+      </currentRevision>
+    </file>
+    <file name="README-merlin.txt" uuid="448de91c-754d-4c60-ab9a-8626a4e5a822" deleted="2017-03-09-T11:40:28Z">
+      <path xml:space="preserve">/user01/PC01/AsusWRT</path>
+      <abspath xml:space="preserve">/user01/PC01/AsusWRT</abspath>
+      <publicURI>48343cd249074bf89de88bd6122ce0d9</publicURI>
+      <currentRevision>
+        <number>1</number>
+        <state>COMPLETED</state>
+        <created>2016-09-07-T12:08:51Z</created>
+        <modified>2016-08-05-T01:12:37Z</modified>
+        <mime>text/plain</mime>
+        <mstyle>text/plain</mstyle>
+        <size>9269</size>
+        <md5>fa2a8c703ee3f5efc9923f300cad127a</md5>
+        <updated>2017-03-09-T08:58:37Z</updated>
+      </currentRevision>
+    </file>
+  </files>
+  <metadata first="0" max="4" total="4" num_folders="4"/>
+</searchresult>
