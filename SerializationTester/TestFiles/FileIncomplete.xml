@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<file name="CORRUPT.md" uuid="2a9c996f-3ff7-4910-bd9b-6c944700281e" time="2017-03-02-T17:58:02Z" host="dn-094">
+  <path xml:space="preserve">/user01/Jotta/Archive</path>
+  <abspath xml:space="preserve">/user01/Jotta/Archive</abspath>
+  <latestRevision>
+    <number>1</number>
+    <state>INCOMPLETE</state>
+    <created>2014-05-22-T22:13:52Z</created>
+    <modified>2014-05-19-T13:37:14Z</modified>
+    <mime>video/mp4</mime>
+    <mstyle>VIDEO_MP4</mstyle>
+    <size>100483008</size> <!-- THIS IS THE SIZE OF WHAT'S BEEN TRANSFERED THIS FAR-->
+    <md5>4d7cdab5256b72d17075ec388e467e99</md5>
+    <updated>2016-06-14-T19:09:48Z</updated>
+  </latestRevision>
+</file>

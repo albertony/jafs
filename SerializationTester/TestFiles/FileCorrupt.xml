@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<file name="CORRUPT.md" uuid="2a9c996f-3ff7-4910-bd9b-6c944700281e" time="2017-03-02-T17:58:02Z" host="dn-094">
+  <path xml:space="preserve">/user01/Jotta/Archive</path>
+  <abspath xml:space="preserve">/user01/Jotta/Archive</abspath>
+  <revision>
+    <number>3</number>
+    <state>CORRUPT</state>
+    <created>2016-06-14-T19:09:47Z</created>
+    <modified>2016-06-14-T19:09:47Z</modified>
+    <mime>text/plain</mime>
+    <mstyle>text/plain</mstyle>
+    <size>318</size>
+    <md5>2ed82c2b9a78f3fce85b19592fc94581</md5>
+    <updated>2016-06-14-T19:09:48Z</updated>
+  </revision>
+</file>

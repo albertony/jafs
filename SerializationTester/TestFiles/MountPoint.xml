@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mountPoint time="2017-03-02-T17:57:46Z" host="dn-094">
+  <name xml:space="preserve">Archive</name>
+  <path xml:space="preserve">/user01/Jotta</path>
+  <abspath xml:space="preserve">/user01/Jotta</abspath>
+  <size>156876</size>
+  <modified>2017-03-02-T11:10:14Z</modified>
+  <device>Jotta</device>
+  <user>user01</user>
+  <folders>
+    <folder name="Test"/>
+  </folders>
+  <files>
+    <file name="AUTHORS.md" uuid="2a9c996f-3ff7-4910-bd9b-6c944700281e">
+      <currentRevision>
+        <number>1</number>
+        <state>COMPLETED</state>
+        <created>2017-03-02-T11:10:13Z</created>
+        <modified>2017-03-02-T11:10:13Z</modified>
+        <mime>application/octet-stream</mime>
+        <mstyle>application/octet-stream</mstyle>
+        <size>318</size>
+        <md5>586e853606991b88103b9f84f79f988e</md5>
+        <updated>2017-03-02-T11:10:14Z</updated>
+      </currentRevision>
+    </file>
+  </files>
+  <metadata first="" max="" total="2" num_folders="1" num_files="1"/>
+</mountPoint>

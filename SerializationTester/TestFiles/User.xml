@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<user time="2017-03-02-T17:38:11Z" host="dn-129">
+  <username>user01</username>
+  <account-type>unlimited</account-type>
+  <locked>false</locked>
+  <capacity>-1</capacity>
+  <max-devices>-1</max-devices>
+  <max-mobile-devices>-1</max-mobile-devices>
+  <usage>156876</usage>
+  <read-locked>false</read-locked>
+  <write-locked>false</write-locked>
+  <quota-write-locked>false</quota-write-locked>
+  <enable-sync>false</enable-sync>
+  <devices>
+    <device>
+      <name xml:space="preserve">Jotta</name>
+      <display_name xml:space="preserve">Jotta</display_name>
+      <type>JOTTA</type>
+      <sid>94f8ebe1-32ce-4fa3-8f47-452cb1552d31</sid>
+      <size>156876</size>
+      <modified>2017-03-02-T11:10:14Z</modified>
+    </device>
+  </devices>
+</user>

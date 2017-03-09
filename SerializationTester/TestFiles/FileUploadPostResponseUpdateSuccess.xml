@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<file name="PI-10000000.txt" uuid="3bd1583e-b7fc-4f50-a592-556b5198acf9" time="2017-03-08-T22:39:51Z" host="dn-149">
+  <path xml:space="preserve">/user01/Jotta/Archive</path>
+  <abspath xml:space="preserve">/user01/Jotta/Archive</abspath>
+  <currentRevision>
+    <number>17</number>
+    <state>COMPLETED</state>
+    <created>2017-03-08-T22:39:51Z</created>
+    <modified>2017-03-08-T22:39:51Z</modified>
+    <mime>text/plain</mime>
+    <mstyle>text/plain</mstyle>
+    <size>10981279</size>
+    <md5>7909481653B3E89780847B08407DB8BE</md5>
+    <updated>2017-03-08-T22:39:51Z</updated>
+  </currentRevision>
+  <revisions>
+    <revision>
+      <number>16</number>
+      <state>COMPLETED</state>
+      <created>2017-03-08-T22:37:41Z</created>
+      <modified>2017-03-08-T22:37:41Z</modified>
+      <mime>text/plain</mime>
+      <mstyle>text/plain</mstyle>
+      <size>10981279</size>
+      <md5>7909481653B3E89780847B08407DB8BE</md5>
+      <updated>2017-03-08-T22:37:45Z</updated>
+    </revision>
+    <revision>
+      <number>15</number>
+      <state>COMPLETED</state>
+      <created>2017-03-08-T22:37:27Z</created>
+      <modified>2017-03-08-T22:37:27Z</modified>
+      <mime>text/plain</mime>
+      <mstyle>text/plain</mstyle>
+      <size>10981279</size>
+      <md5>7909481653B3E89780847B08407DB8BE</md5>
+      <updated>2017-03-08-T22:37:31Z</updated>
+    </revision>
+    <revision>
+      <number>14</number>
+      <state>INCOMPLETE</state>
+      <created>2017-03-08-T22:36:15Z</created>
+      <modified>2017-03-08-T22:36:15Z</modified>
+      <mime>text/plain</mime>
+      <mstyle>text/plain</mstyle>
+      <md5>7909481653B3E89780847B08407DB8BE</md5>
+      <updated>2017-03-08-T22:36:15Z</updated>
+    </revision>
+    <revision>
+      <number>13</number>
+      <state>COMPLETED</state>
+      <created>2017-03-08-T22:36:07Z</created>
+      <modified>2017-03-08-T22:36:07Z</modified>
+      <mime>text/plain</mime>
+      <mstyle>text/plain</mstyle>
+      <size>10981279</size>
+      <md5>7909481653B3E89780847B08407DB8BE</md5>
+      <updated>2017-03-08-T22:36:11Z</updated>
+    </revision>
+  </revisions>
+</file>

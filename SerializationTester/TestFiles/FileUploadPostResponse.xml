@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<file name="PI-10000000.txt" uuid="3bd1583e-b7fc-4f50-a592-556b5198acf9" time="2017-03-08-T20:16:18Z" host="dn-134">
+  <path xml:space="preserve">/user01/Jotta/Archive</path>
+  <abspath xml:space="preserve">/user01/Jotta/Archive</abspath>
+  <currentRevision>
+    <number>1</number>
+    <state>COMPLETED</state>
+    <created>2017-03-08-T20:16:18Z</created>
+    <modified>2017-03-08-T20:16:18Z</modified>
+    <mime>text/plain</mime>
+    <mstyle>text/plain</mstyle>
+    <size>10981283</size>
+    <md5>AA1320F0EE6F05920EE6943879D7218D</md5>
+    <updated>2017-03-08-T20:16:15Z</updated>
+  </currentRevision>
+</file>

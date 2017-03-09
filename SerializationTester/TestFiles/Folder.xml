@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<folder name="Test" time="2017-03-04-T19:59:23Z" host="dn-098">
+  <path xml:space="preserve">/user01/Jotta/Archive</path>
+  <abspath xml:space="preserve">/user01/Jotta/Archive</abspath>
+  <folders>
+    <folder name="contrib"/>
+    <folder name="Duplicati"/>
+    <folder name="NewSubfolder" deleted="2017-03-04-T09:44:04Z">
+      <abspath xml:space="preserve">/user01/Jotta/Archive/Test</abspath>
+    </folder>
+  </folders>
+  <files>
+    <file name="cli.py" uuid="3d5fbee8-66b7-4409-a144-7eb080ea50c3">
+      <currentRevision>
+        <number>2</number>
+        <state>COMPLETED</state>
+        <created>2017-03-02-T10:37:01Z</created>
+        <modified>2017-03-02-T10:37:01Z</modified>
+        <mime>application/octet-stream</mime>
+        <mstyle>application/octet-stream</mstyle>
+        <size>28596</size>
+        <md5>d096034802e8d041b5b1739470594be4</md5>
+        <updated>2017-03-02-T10:37:02Z</updated>
+      </currentRevision>
+    </file>
+    <file name="JFS.py" uuid="513dbf9a-f788-4d8c-9bec-a0c6a23e6c55">
+      <currentRevision>
+        <number>1</number>
+        <state>COMPLETED</state>
+        <created>2017-03-02-T10:28:17Z</created>
+        <modified>2017-03-02-T10:28:17Z</modified>
+        <mime>application/octet-stream</mime>
+        <mstyle>application/octet-stream</mstyle>
+        <size>48409</size>
+        <md5>1af255b9434d4ce28d4156ebca10cf5c</md5>
+        <updated>2017-03-02-T10:28:18Z</updated>
+      </currentRevision>
+    </file>
+    <file name="jottacloud.py" uuid="07d52b07-2cdf-4e72-9ff3-349053b58352">
+      <currentRevision>
+        <number>1</number>
+        <state>COMPLETED</state>
+        <created>2017-03-02-T10:28:17Z</created>
+        <modified>2017-03-02-T10:28:17Z</modified>
+        <mime>application/octet-stream</mime>
+        <mstyle>application/octet-stream</mstyle>
+        <size>12512</size>
+        <md5>f3379ef78d5484c1286f92ec8f62b555</md5>
+        <updated>2017-03-02-T10:28:18Z</updated>
+      </currentRevision>
+    </file>
+    <file name="jottafuse.py" uuid="8f3e1418-fce2-4078-b907-17d151073d26">
+      <currentRevision>
+        <number>1</number>
+        <state>COMPLETED</state>
+        <created>2017-03-02-T10:28:17Z</created>
+        <modified>2017-03-02-T10:28:17Z</modified>
+        <mime>application/octet-stream</mime>
+        <mstyle>application/octet-stream</mstyle>
+        <size>13217</size>
+        <md5>59c4bd52ec0e2f4bb8ac230266b2d358</md5>
+        <updated>2017-03-02-T10:28:17Z</updated>
+      </currentRevision>
+    </file>
+    <file name="monitor.py" uuid="14438b95-120e-44eb-b456-0370bd25484b">
+      <currentRevision>
+        <number>1</number>
+        <state>COMPLETED</state>
+        <created>2017-03-02-T10:28:16Z</created>
+        <modified>2017-03-02-T10:28:16Z</modified>
+        <mime>application/octet-stream</mime>
+        <mstyle>application/octet-stream</mstyle>
+        <size>8559</size>
+        <md5>bb8bee988d6fee93d95634db50a1a7cb</md5>
+        <updated>2017-03-02-T10:28:16Z</updated>
+      </currentRevision>
+    </file>
+    <file name="qt.py" uuid="d910a612-9df0-4cde-ac77-e55b8c8cd96d" deleted="2017-03-04-T19:27:09Z">
+      <abspath xml:space="preserve">/user01/Jotta/Archive/Test</abspath>
+      <currentRevision>
+        <number>1</number>
+        <state>COMPLETED</state>
+        <created>2017-03-02-T10:28:16Z</created>
+        <modified>2017-03-02-T10:28:16Z</modified>
+        <mime>application/octet-stream</mime>
+        <mstyle>application/octet-stream</mstyle>
+        <size>6449</size>
+        <md5>5af38bcd1ac7e69e42495a65cb6ff94d</md5>
+        <updated>2017-03-02-T10:28:16Z</updated>
+      </currentRevision>
+    </file>
+    <file name="scanner.py" uuid="63fe0c7f-fe58-4fb5-9525-9b80dabfd368">
+      <currentRevision>
+        <number>1</number>
+        <state>COMPLETED</state>
+        <created>2017-03-02-T10:28:15Z</created>
+        <modified>2017-03-02-T10:28:15Z</modified>
+        <mime>application/octet-stream</mime>
+        <mstyle>application/octet-stream</mstyle>
+        <size>5128</size>
+        <md5>5ea97478f5b2663d380858028405d63f</md5>
+        <updated>2017-03-02-T10:28:16Z</updated>
+      </currentRevision>
+    </file>
+    <file name="__init__.py" uuid="311c958b-3177-4801-a705-cc1a6fa6c420">
+      <currentRevision>
+        <number>1</number>
+        <state>COMPLETED</state>
+        <created>2017-03-02-T10:28:18Z</created>
+        <modified>2017-03-02-T10:28:18Z</modified>
+        <mime>application/octet-stream</mime>
+        <mstyle>application/octet-stream</mstyle>
+        <size>20</size>
+        <md5>48022a5ef9eca64885c330e2e427a1ed</md5>
+        <updated>2017-03-02-T10:28:19Z</updated>
+      </currentRevision>
+    </file>
+  </files>
+  <metadata first="" max="" total="11" num_folders="3" num_files="8"/>
+</folder>

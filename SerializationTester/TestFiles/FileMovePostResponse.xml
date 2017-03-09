@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<file name="jottacloud_renamed.py" uuid="07d52b07-2cdf-4e72-9ff3-349053b58352" time="2017-03-08-T19:36:23Z" host="dn-147">
+  <path xml:space="preserve">/user01/Jotta/Archive/Test</path>
+  <abspath xml:space="preserve">/user01/Jotta/Archive/Test</abspath>
+  <currentRevision>
+    <number>1</number>
+    <state>COMPLETED</state>
+    <created>2017-03-02-T10:28:17Z</created>
+    <modified>2017-03-02-T10:28:17Z</modified>
+    <mime>application/octet-stream</mime>
+    <mstyle>application/octet-stream</mstyle>
+    <size>12512</size>
+    <md5>f3379ef78d5484c1286f92ec8f62b555</md5>
+    <updated>2017-03-02-T10:28:18Z</updated>
+  </currentRevision>
+</file>

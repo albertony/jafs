@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<folder name="Archive" deleted="2017-03-04-T19:09:21Z" time="2017-03-04-T19:23:35Z" host="dn-098">
+  <path xml:space="preserve">/user01/Jotta/Archive</path>
+  <abspath xml:space="preserve">/user01/Jotta/Archive</abspath>
+  <folders>
+    <folder name="Test" deleted="2017-03-04-T19:09:21Z">
+      <abspath xml:space="preserve">/user01/Jotta/Archive/Archive</abspath>
+    </folder>
+  </folders>
+  <metadata first="" max="" total="1" num_folders="1" num_files="0"/>
+</folder>

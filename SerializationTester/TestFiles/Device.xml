@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<device time="2017-03-06-T16:34:22Z" host="dn-096">
+  <name xml:space="preserve">Jotta</name>
+  <display_name xml:space="preserve">Jotta</display_name>
+  <type>JOTTA</type>
+  <sid>94f8ebe1-32ce-4fa3-8f47-452cb1552d31</sid>
+  <size>108697072</size>
+  <modified>2017-03-06-T14:29:15Z</modified>
+  <user>user01</user>
+  <mountPoints>
+    <mountPoint>
+      <name xml:space="preserve">AONTestMount</name>
+      <deleted>2017-03-06-T10:45:57Z</deleted>
+      <abspath xml:space="preserve">/user01/Jotta</abspath>
+      <size>21962566</size>
+      <modified>2017-03-05-T12:46:03Z</modified>
+    </mountPoint>
+    <mountPoint>
+      <name xml:space="preserve">AONTestMount2</name>
+      <deleted>2017-03-06-T10:34:09Z</deleted>
+      <abspath xml:space="preserve">/user01/Jotta</abspath>
+      <size>0</size>
+      <modified></modified>
+    </mountPoint>
+    <mountPoint>
+      <name xml:space="preserve">Archive</name>
+      <size>86734506</size>
+      <modified>2017-03-06-T14:29:15Z</modified>
+    </mountPoint>
+    <mountPoint>
+      <name xml:space="preserve">Latest</name>
+      <size>0</size>
+      <modified></modified>
+    </mountPoint>
+    <mountPoint>
+      <name xml:space="preserve">Shared</name>
+      <size>0</size>
+      <modified></modified>
+    </mountPoint>
+    <mountPoint>
+      <name xml:space="preserve">Sync</name>
+      <size>0</size>
+      <modified></modified>
+    </mountPoint>
+  </mountPoints>
+  <metadata first="" max="" total="6" num_mountpoints="6"/>
+</device>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<file name="PI-10000000.txt" uuid="3bd1583e-b7fc-4f50-a592-556b5198acf9" time="2017-03-08-T22:30:32Z" host="dn-139">
+  <currentRevision>
+    <number>8</number>
+    <state>COMPLETED</state>
+    <created>2017-03-08-T22:30:28Z</created>
+    <modified>2017-03-08-T22:30:28Z</modified>
+    <mime>text/plain</mime>
+    <mstyle>text/plain</mstyle>
+    <size>10981283</size>
+    <md5>AA1320F0EE6F05920EE6943879D7218D</md5>
+    <updated>2017-03-08-T22:30:32Z</updated>
+  </currentRevision>
+  <latestRevision>
+    <number>9</number>
+    <state>INCOMPLETE</state>
+    <created>2017-03-08-T22:30:32Z</created>
+    <modified>2017-03-08-T22:30:32Z</modified>
+    <mime>text/plain</mime>
+    <mstyle>text/plain</mstyle>
+    <md5>AA1320F0EE6F05920EE6943879D7218D</md5>
+    <updated>2017-03-08-T22:30:32Z</updated>
+  </latestRevision>
+</file>

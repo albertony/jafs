@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mountPoint time="2017-03-08-T21:07:04Z" host="dn-138">
+  <name xml:space="preserve">Test2</name>
+  <path xml:space="preserve">/user01/PCAON</path>
+  <abspath xml:space="preserve">/user01/PCAON</abspath>
+  <size>0</size>
+  <modified></modified>
+  <device>PCAON</device>
+  <user>user01</user>
+</mountPoint>
