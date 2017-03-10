@@ -74,7 +74,7 @@ namespace JaFS
             }
             return names;
         }
-        public JFSDevice GetDevice(string deviceName = null, string displayName = null, JFSData.JFSDataDeviceType? type = null, Guid? sid = null)
+        public JFSDevice GetDevice(string deviceName = null, string displayName = null, JFSData.JFSDataDeviceType? type = null, Guid? id = null)
         {
             // Get device based one or several criteria, using only the limited device information already
             // retrieved as part of the root (user) data.
@@ -83,7 +83,7 @@ namespace JaFS
                 if ((deviceName == null || Data.Devices[i].Name == deviceName)
                   && (displayName == null || Data.Devices[i].DisplayNameData.String == displayName)
                   && (type == null || Data.Devices[i].Type == type)
-                  && (sid == null || Data.Devices[i].SID.Guid == sid))
+                  && (id == null || Data.Devices[i].SID.Guid == id))
                 {
                     return new JFSDevice(this, Data.Devices[i], false);
                 }
@@ -924,7 +924,7 @@ namespace JaFS
         public string DisplayName { get { return Data.DisplayNameData.String; } }
         public JFSData.JFSDataDeviceType Type { get { return Data.Type; } }
         public bool IsBuiltInDevice { get { return Name == Jottacloud.BUILTIN_DEVICE_NAME || Type == JFSData.JFSDataDeviceType.BuiltIn; } } // Testing both name and type, just to be on the safe side..
-        public Guid SID { get { return Data.SID.Guid; } }
+        public Guid ID { get { return Data.SID.Guid; } }
         public DateTime? Modified { get { return Data.Modified.DateTime; } }
         public ulong SizeInBytes { get { return Data.Size.Value; } }
         public string Size { get { return Data.Size.ToString(); } }
@@ -1502,10 +1502,10 @@ namespace JaFS
         public DateTime? Deleted { get { return Data.Deleted; } }
         public bool IsDeleted { get { return Deleted != null; } }
         public string SharedSecret { get { return Data.PublicURI; } }
-        public bool IsShared{ get { return SharedSecret != null; } }
+        public bool IsShared { get { return SharedSecret != null; } }
         public string OriginalParentPath { get { return Data.OriginalPath != null ? FileSystem.ConvertFromDataPath(Data.OriginalPath) + "/" : null; } } // If deleted this contains the full path to the original parent, since ParentPath is the path within Trash. For deleted files this is present also in incomplete data objects
         public string OriginalFullName { get { return OriginalParentPath == null ? null : OriginalParentPath + Name; } } // If deleted this contains the original Full path of this object. Never ending with path separator.
-        public Guid GUID { get { return Data.UUID; } }
+        public Guid ID { get { return Data.UUID; } }
         protected override string CreateChildPath(string childName) { throw new InvalidOperationException(); } // Not supported for files!
         public JFSFileBase(Jottacloud fileSystem, JFSData.JFSFileData dataWithPath, bool isCompleteData) : base(fileSystem, dataWithPath, isCompleteData) { }
         public JFSFileBase(Jottacloud fileSystem, string parentFullName, JFSData.JFSFileData incompleteDataWithoutPath) : base(fileSystem, parentFullName, incompleteDataWithoutPath) { }
@@ -1568,7 +1568,16 @@ namespace JaFS
     }
 
     //
-    // Corrupt file. Have a LatestRevision, but without an MD5 hash (?) and without a size like incomplete and complete files.
+    // Corrupt file.
+    // You will get a corrupt file if the server detects a hash mismatch between the MD5 and the content supplied.
+    // Corrupt files have LatestRevision, possibly in addition to a CurrentRevision: The CurrentRevision is then the
+    // most recent complete revision of the file, while the LatestRevision is the most recent upload which did not
+    // complete. The revision number of the LatestVersion should always be larger than that of the CurrentRevision,
+    // because when an upload successfully completes it will be stored as a new CurrentRevision and the existing
+    // LatestRevision will be deleted (moved to the "revisions" list).
+    // The LatestRevision should have state set to "Corrupted", it does not have a size attribute, and it may
+    // or may not have an MD5 hash (currently it seems uploading with hash mismatch actually stores the supplied
+    // MD5).
     //
     public class JFSCorruptFile : JFSFileBase
     {
@@ -1579,12 +1588,18 @@ namespace JaFS
         public virtual string MD5 { get { return Data.LatestRevision.MD5; } }
         public virtual System.Net.Mime.ContentType Mime { get { return Data.LatestRevision.Mime.Mime; } }
         public virtual JFSData.JFSDataFileState State { get { return Data.LatestRevision.State; } }
+        public long NumberOfVersions { get { return (HasPreviousCompletedVersion ? 2 : 1) + (Data.OldRevisions != null ? Data.OldRevisions.Length : 0); } } // This, the LatestRevision counts 1. If there is a previous completed version it counts +1. And if there are more old revisions they count as well.
+        public bool HasPreviousCompletedVersion { get { return Data.CurrentRevision != null; } }
+        public JFSFile GetCompletedVersion() { return HasPreviousCompletedVersion ? new JFSFile(FileSystem, Data, CompleteData) : null; }
+        public JFSFile GetOldVersion(int steps = 1) { throw new NotImplementedException(); }
         public JFSCorruptFile(Jottacloud fileSystem, JFSData.JFSFileData dataWithPath, bool isCompleteData) : base(fileSystem, dataWithPath, isCompleteData) { }
         public JFSCorruptFile(Jottacloud fileSystem, string parentFullName, JFSData.JFSFileData incompleteDataWithoutPath) : base(fileSystem, parentFullName, incompleteDataWithoutPath) {}
     }
 
     //
-    // Incomplete file. Like a corrupt file, but with MD5 hash and with a Size property keeping number of bytes transfered so far,
+    // Incomplete file.
+    // You will get an incomplete file if the server detects a mismatch between the file size specified and the size of the content.
+    // Like a corrupt file, but with MD5 hash and with a Size property keeping number of bytes transfered so far,
     // and with a Resume method for continuing the transfer.
     //
     public class JFSIncompleteFile : JFSCorruptFile
@@ -1748,10 +1763,10 @@ namespace JaFS
     //
     public sealed class JFSFileSystemInfo
     {
-        public JFSFileSystemInfo(string name, Guid uuid, JFSData.JFSDataFileState state, ulong? size, string md5)
+        public JFSFileSystemInfo(string name, Guid id, JFSData.JFSDataFileState state, ulong? size, string md5)
         {
             Name = name;
-            UUID = uuid;
+            ID = id;
             Size = size;
             MD5 = md5;
             switch (state)
@@ -1772,7 +1787,7 @@ namespace JaFS
             Corrupt
         }
         public string Name { get; }
-        public Guid UUID { get; }
+        public Guid ID { get; }
         public FileState State { get; }
         public ulong? Size { get; } // Not set if state is corrupt or incomplete (since loaded from limited information in JFSFileDirList).
         public string MD5 { get; } // Not set if state is corrupt

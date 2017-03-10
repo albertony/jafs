@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<file name="PI-10000000.txt" uuid="3fc8a157-d1de-4030-ba38-a65aed5aa72b" time="2017-03-10-T07:28:36Z" host="dn-098">
+  <path xml:space="preserve">/user01/Jotta/Archive</path>
+  <abspath xml:space="preserve">/user01/Jotta/Archive</abspath>
+  <publicURI>2d7994106f034a60b3eb1542167ee783</publicURI>
+  <currentRevision>
+    <number>10</number>
+    <state>COMPLETED</state>
+    <created>2017-03-09-T14:52:57Z</created>
+    <modified>2017-03-09-T14:52:57Z</modified>
+    <mime>text/plain</mime>
+    <mstyle>text/plain</mstyle>
+    <size>10981279</size>
+    <md5>7909481653B3E89780847B08407DB8BE</md5>
+    <updated>2017-03-09-T14:52:58Z</updated>
+  </currentRevision>
+  <revisions>
+    <revision>
+      <number>9</number>
+      <state>COMPLETED</state>
+      <created>2017-03-09-T14:52:55Z</created>
+      <modified>2017-03-09-T14:52:55Z</modified>
+      <mime>text/plain</mime>
+      <mstyle>text/plain</mstyle>
+      <size>10981279</size>
+      <md5>7909481653B3E89780847B08407DB8BE</md5>
+      <updated>2017-03-09-T14:52:56Z</updated>
+    </revision>
+    <revision>
+      <number>8</number>
+      <state>COMPLETED</state>
+      <created>2017-03-08-T23:29:29Z</created>
+      <modified>2017-03-08-T23:29:29Z</modified>
+      <mime>text/plain</mime>
+      <mstyle>text/plain</mstyle>
+      <size>10981279</size>
+      <md5>7909481653B3E89780847B08407DB8BE</md5>
+      <updated>2017-03-08-T23:29:33Z</updated>
+    </revision>
+    <revision>
+      <number>7</number>
+      <state>COMPLETED</state>
+      <created>2017-03-08-T23:28:44Z</created>
+      <modified>2017-03-08-T23:28:44Z</modified>
+      <mime>text/plain</mime>
+      <mstyle>text/plain</mstyle>
+      <size>10981279</size>
+      <md5>7909481653B3E89780847B08407DB8BE</md5>
+      <updated>2017-03-08-T23:28:47Z</updated>
+    </revision>
+    <revision>
+      <number>6</number>
+      <state>COMPLETED</state>
+      <created>2017-03-08-T23:28:26Z</created>
+      <modified>2017-03-08-T23:28:26Z</modified>
+      <mime>text/plain</mime>
+      <mstyle>text/plain</mstyle>
+      <size>10981279</size>
+      <md5>7909481653B3E89780847B08407DB8BE</md5>
+      <updated>2017-03-08-T23:28:30Z</updated>
+    </revision>
+  </revisions>
+</file>

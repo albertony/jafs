@@ -89,6 +89,7 @@
     <Content Include="TestFiles\FileUploadPostResponseNewSuccess.xml" />
     <Content Include="TestFiles\FileUploadPostResponseUpdateSuccess.xml" />
     <Content Include="TestFiles\FileUploadPostResponseUpdateSuccess2.xml" />
+    <Content Include="TestFiles\FileWithHistory.xml" />
     <Content Include="TestFiles\Folder.xml" />
     <Content Include="TestFiles\FolderDeleted.xml" />
     <Content Include="TestFiles\Links.xml" />

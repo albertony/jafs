@@ -91,6 +91,16 @@ namespace JottaLibSerializationTester
                 obj = (JFSEnableSharingData)serializer.Deserialize(reader);
                 reader.Close();
             }
+
+            {
+                JFSFileData obj = null;
+                string xmlFilePath = testFilesPath + @"\FileWithHistory.xml";
+                XmlSerializer serializer = new XmlSerializer(typeof(JFSFileData));
+                StreamReader reader = new StreamReader(xmlFilePath);
+                obj = (JFSFileData)serializer.Deserialize(reader);
+                reader.Close();
+            }
+
         }
     }
 }

@@ -47,22 +47,23 @@ namespace JFSData
         public JFSDataStringWithWhiteSpaceHandling PathData { get; set; }
 
         [XmlIgnore()]
-        public override string Path { get { return PathData.String; } } // Implementation of JFSNamedAndPathedRootObjectData
+        public override string Path { get { return PathData != null ? PathData.String : null; } } // Implementation of JFSNamedAndPathedRootObjectData
 
         [XmlElement("abspath")] // For deleted folders that are in trash this will contain the original location, while path is the location within trash. For files not in trash this is identical to path.
         public JFSDataStringWithWhiteSpaceHandling OriginalPathData { get; set; }
 
         [XmlIgnore()]
-        public override string OriginalPath { get { return OriginalPathData.String; } } // Implementation of JFSNamedAndPathedRootObjectData
+        public override string OriginalPath { get { return OriginalPathData != null ? OriginalPathData.String : null; } } // Implementation of JFSNamedAndPathedRootObjectData
 
-        [XmlElement("currentRevision")] // Normal, completed files have this
+        [XmlElement("currentRevision")] // The latest successful, completed revision of the file.
         public JSFileRevisionData CurrentRevision { get; set; }
 
-        [XmlElement("latestRevision")] // Incomplete or, possibly, corrupt files have this
+        [XmlElement("latestRevision")] // Incomplete and corrupt files have this, and it represents the latest unsuccessful upload. There might also be a CurrentRevision representing an older successful upload.
         public JSFileRevisionData LatestRevision { get; set; }
 
-        [XmlElement("revision")]
-        public JSFileRevisionData Revision { get; set; } // Corrupt files have this
+        [XmlArray("revisions")]
+        [XmlArrayItem("revision", IsNullable = false)]
+        public JSFileRevisionData[] OldRevisions { get; set; }
 
     }
 
