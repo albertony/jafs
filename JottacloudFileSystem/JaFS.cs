@@ -24,10 +24,10 @@ namespace JaFS
     //
     public sealed class Jottacloud
     {
-        private const string JFS_BASE_URL = "https://www.jottacloud.com/jfs";
+        private const string JFS_BASE_URL = "https://jfs.jottacloud.com/jfs"; // Previously: "https://www.jottacloud.com/jfs"
         private const string JFS_BASE_URL_UPLOAD = "https://up.jottacloud.com/jfs";
         public const string BUILTIN_DEVICE_NAME = "Jotta";
-        public string ApiVersion { get { return "2.2"; } } // API version, hard coded per 06.03.2017 (same as in havardgulldahl/jottalib since October 2014).
+        public string ApiVersion { get { return "2.4"; } } // API version. Previously 2.2, against www.jottacloud.com, per 06.03.2017, same as in havardgulldahl/jottalib since October 2014.
         public string LibraryVersion { get { return System.Diagnostics.FileVersionInfo.GetVersionInfo(System.Reflection.Assembly.GetExecutingAssembly().Location).FileVersion; } }
         private string RootName { get { return Credentials.UserName; } } // Cannot use Root.Name because the value here is needed for fetching that Root object!
         private NetworkCredential Credentials { get; set; }
@@ -55,7 +55,8 @@ namespace JaFS
         {
             Credentials = credentials;
             RequestHeaders = new Dictionary<string, string>() {
-                { "X-JottaAPIVersion", ApiVersion } // Not required, github.com/paaland/node-jfs does not use it, but github.com/havardgulldahl/jottalib do!
+                //{ "X-JottaAPIVersion", ApiVersion } // Old header name used with API version 2.2, against www.jottacloud.com, per 06.03.2017, same as in havardgulldahl/jottalib since October 2014. github.com/paaland/node-jfs does not use it, but github.com/havardgulldahl/jottalib do!
+                { "x-jftp-version", ApiVersion } // New header name used for API version 2.4. Not required..
             };
             FetchDataObject();
         }
@@ -452,18 +453,18 @@ namespace JaFS
         }
         public JFSData.JFSFileData VerifyFile(string remotePath, FileInfo fileInfo, string md5Hash)
         {
-            // Check if there is a file at specified location with same name, size, MD5 hash, modified date and created date as the specified local file!
-            return VerifyFile(remotePath, fileInfo.Length.ToString(), fileInfo.CreationTime.ToString("o"), fileInfo.LastWriteTime.ToString("o"), md5Hash);
+            // Check if there is a file at specified location with same name and MD5 hash as the specified local file!
+            return VerifyFile(remotePath, fileInfo.Length.ToString(), fileInfo.CreationTime.ToUniversalTime().ToString("o"), fileInfo.LastWriteTime.ToUniversalTime().ToString("o"), md5Hash);
         }
         private JFSData.JFSFileData VerifyFile(string remotePath, string size, string timeCreated, string timeModified, string md5Hash)
         {
-            // Check if there is a file at specified location with same name, size, MD5 hash, modified date and created date as the specified local file!
-            var queryParameters = new Dictionary<string, string> { { "cphash", md5Hash } };
+            // Check if there is a file at specified location with same name, and MD5 hash as the specified local file!
+            var queryParameters = new Dictionary<string, string> { { "cphash", "true" } };
             var additionalHeaders = new Dictionary<string, string> {
                 { "JMd5", md5Hash },
+                { "JSize", size },
                 { "JCreated", timeCreated },
                 { "JModified", timeModified },
-                { "JSize", size },
             };
             Uri uri = CreateUri(remotePath, queryParameters, forUpload: false);
             var request = CreateRequest(HttpMethod.Post, uri, additionalHeaders);
@@ -472,6 +473,11 @@ namespace JaFS
             // Send request, and read response
             using (HttpWebResponse response = (HttpWebResponse)request.GetResponse())
             {
+                // Expecting status code 200 if match was found, and 404 if not.
+                if (response.StatusCode == HttpStatusCode.NotFound)
+                {
+                    return null;
+                }
                 if (response.StatusCode != HttpStatusCode.OK)
                 {
                     throw new JFSError(response.StatusDescription);
@@ -513,8 +519,8 @@ namespace JaFS
         {
             long fileSize = fileInfo.Length;
             string sizeString = fileSize.ToString();
-            var timeCreated = fileInfo.CreationTime.ToString("o");
-            var timeModified = fileInfo.LastWriteTime.ToString("o");
+            var timeCreated = fileInfo.CreationTime.ToUniversalTime().ToString("o");
+            var timeModified = fileInfo.LastWriteTime.ToUniversalTime().ToString("o");
             if (offset < 0)
                 throw new InvalidOperationException("Negative file offset is not valid");
             else if (offset > fileSize)
@@ -529,10 +535,13 @@ namespace JaFS
                 var fileData = VerifyFile(remotePath, sizeString, timeCreated, timeModified, md5Hash);
                 // Verify that the file is complete and not corrupt
                 JFSData.JFSDataFileState state = JFSData.JFSDataFileState.Processing;
-                if (fileData.LatestRevision != null)
-                    state = fileData.LatestRevision.State;
-                else if (fileData.CurrentRevision != null)
-                    state = fileData.CurrentRevision.State;
+                if (fileData != null)
+                {
+                    if (fileData.LatestRevision != null)
+                        state = fileData.LatestRevision.State;
+                    else if (fileData.CurrentRevision != null)
+                        state = fileData.CurrentRevision.State;
+                }
                 if (state == JFSData.JFSDataFileState.Completed)
                 {
                     return fileData; // File already exists!
@@ -543,16 +552,12 @@ namespace JaFS
                     // Move stream back to 0, or specified offset, after the MD5 calculation has used it.
                     fileStream.Seek(offset, SeekOrigin.Begin);
                     // Configure url, query parameters  and request headers
-                    var queryParameters = new Dictionary<string, string> {
-                        { "umode", "nomultipart" },
-                        //{ "cphash", md5Hash }
-                    };
-                    string fileTime = fileInfo.LastWriteTime.ToString("o"); // Fallback to DateTime.Now.ToString("o") in case of any problems?
+                    var queryParameters = new Dictionary<string, string> { { "umode", "nomultipart" } };
                     var additionalHeaders = new Dictionary<string, string> {
                         { "JMd5", md5Hash },
+                        { "JSize", sizeString },
                         { "JCreated", timeCreated },
                         { "JModified", timeModified },
-                        { "JSize", sizeString },
                     };
                     Uri uri = CreateUri(remotePath, queryParameters, forUpload: true);
                     var request = CreateRequest(HttpMethod.Post, uri, additionalHeaders);
@@ -605,7 +610,7 @@ namespace JaFS
                 }
             }
         }
-        public JFSData.JFSFileData UploadSimple(string path, FileInfo fileInfo, long offset = 0, bool cpHash=false)
+        public JFSData.JFSFileData UploadSimple(string path, FileInfo fileInfo, long offset = 0, bool noHashVerification = false, bool noFileTimes = false)
         {
             // Upload a fileobject to path, HTTP POST-ing to up.jottacloud.com, using the JottaCloud API.
             long fileSize = fileInfo.Length;
@@ -613,29 +618,26 @@ namespace JaFS
                 throw new InvalidOperationException("Negative file offset is not valid");
             else if (offset > fileSize)
                 throw new InvalidOperationException("Offset is larger than file size");
-            string md5Hash;
             using (FileStream fileStream = fileInfo.OpenRead())
             {
-                // Calculate MD5 hash
-                md5Hash = CalculateMD5(fileStream);
                 // Move stream back to 0, or specified offset, after the MD5 calculation has used it.
                 fileStream.Seek(offset, SeekOrigin.Begin);
                 // Configure url, query parameters  and request headers
-                var queryParameters = new Dictionary<string, string> {
-                        { "umode", "nomultipart" },
-                        //{ "cphash", md5Hash }
-                };
-                if (cpHash)
+                var additionalHeaders = new Dictionary<string, string> { { "JSize", fileSize.ToString() } }; // Required header!
+                if (!noFileTimes)
                 {
-                    queryParameters.Add("cphash", md5Hash);
+                    // Record the local file times when storing on server.
+                    // If not the server will just register the current date time when it stores the file.
+                    additionalHeaders.Add("JCreated", fileInfo.CreationTime.ToUniversalTime().ToString("o"));
+                    additionalHeaders.Add("JModified", fileInfo.LastWriteTime.ToUniversalTime().ToString("o"));
                 }
-                string fileTime = fileInfo.LastWriteTime.ToString("o"); // Fallback to DateTime.Now.ToString("o") in case of any problems?
-                var additionalHeaders = new Dictionary<string, string> {
-                    { "JMd5", md5Hash },
-                    { "JCreated", fileTime },
-                    { "JModified", fileTime },
-                    { "JSize", fileSize.ToString() },
-                };
+                if (!noHashVerification)
+                {
+                    // Calculate MD5 hash and put as header so that the server can verify it against received data.
+                    // If not, the server will just accept whatever data we give it (as long as it matches the required header JSize), and it will return back the MD5 of it.
+                    additionalHeaders.Add("JMd5", CalculateMD5(fileStream));
+                }
+                var queryParameters = new Dictionary<string, string> { { "umode", "nomultipart" } };
                 Uri uri = CreateUri(path, queryParameters, forUpload: true);
                 var request = CreateRequest(HttpMethod.Post, uri, additionalHeaders);
                 //request.ContentType = "application/octet-stream";
@@ -687,7 +689,7 @@ namespace JaFS
                 }
             }
         }
-        public JFSData.JFSFileData UploadMultipart(string path, FileInfo fileInfo, long offset = 0, bool cpHash = true)
+        public JFSData.JFSFileData UploadMultipart(string path, FileInfo fileInfo, long offset = 0)
         {
             // Upload a fileobject to path, HTTP POST-ing to up.jottacloud.com, using the JottaCloud API.
             // If offset is specified we are resuming from a previous attempt.
@@ -705,20 +707,13 @@ namespace JaFS
                 fileStream.Seek(offset, SeekOrigin.Begin);
                 // Configure url, query parameters  and request headers
                 //var deviceName = GetDeviceNameFromPath(path);
-                //var queryParameters = new Dictionary<string, string> { { "cphash", md5Hash } };
-                var queryParameters = new Dictionary<string, string>();
-                if (cpHash)
-                {
-                    queryParameters.Add("cphash", md5Hash);
-                }
-
-                var timeCreated = fileInfo.CreationTime.ToString("o");
-                var timeModified = fileInfo.LastWriteTime.ToString("o");
+                var timeCreated = fileInfo.CreationTime.ToUniversalTime().ToString("o");
+                var timeModified = fileInfo.LastWriteTime.ToUniversalTime().ToString("o");
                 var additionalHeaders = new Dictionary<string, string> {
                     { "JMd5", md5Hash },
+                    { "JSize", fileSize.ToString() },
                     { "JCreated", timeCreated },
                     { "JModified", timeModified },
-                    { "JSize", fileSize.ToString() },
                     // The following are used by havardgulldahl/jottalib but does not seem to be mandatory.
                     //{ "X-Jfs-DeviceName", deviceName },
                     //{ "jx_csid", "" },
@@ -737,7 +732,7 @@ namespace JaFS
                   + CreateMultiPartItem("created", timeCreated, multipartBoundary) + "\r\n"
                   + CreateMultiPartFileHeader("file", fileInfo.Name, null, multipartBoundary) + "\r\n");
                 byte[] multipartTerminator = Encoding.UTF8.GetBytes("\r\n--" + multipartBoundary + "--\r\n");
-                Uri uri = CreateUri(path, queryParameters, forUpload: true);
+                Uri uri = CreateUri(path, null, forUpload: true);
                 var request = CreateRequest(HttpMethod.Post, uri, additionalHeaders);
                 request.ContentType = "multipart/form-data; boundary=" + multipartBoundary;
                 request.ContentLength = multiPartContent.Length + (fileSize-offset) + multipartTerminator.Length;
