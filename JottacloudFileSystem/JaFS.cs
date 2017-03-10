@@ -61,6 +61,10 @@ namespace JaFS
             FetchDataObject();
         }
         public Jottacloud(string username, string password) : this(new NetworkCredential(username, password)) { }
+        public void Refresh()
+        {
+            FetchDataObject();
+        }
         private void FetchDataObject()
         {
             Data = FetchObject<JFSData.JFSUserData>(""); // Fetch the user object, which is our root level data object.
@@ -80,8 +84,8 @@ namespace JaFS
             // retrieved as part of the root (user) data.
             for (int i = 0; i < Data.Devices.Length; i++)
             {
-                if ((deviceName == null || Data.Devices[i].Name == deviceName)
-                  && (displayName == null || Data.Devices[i].DisplayNameData.String == displayName)
+                if ((deviceName == null || string.Equals(Data.Devices[i].Name, deviceName, StringComparison.OrdinalIgnoreCase)) // NB: Might as well ignore case since REST API is case insensitive!
+                  && (displayName == null || string.Equals(Data.Devices[i].DisplayNameData.String, displayName, StringComparison.OrdinalIgnoreCase))
                   && (type == null || Data.Devices[i].Type == type)
                   && (id == null || Data.Devices[i].SID.Guid == id))
                 {
@@ -231,23 +235,23 @@ namespace JaFS
             var trashData = FetchObject<JFSData.JFSMountPointData>(path);
             return new JFSTrash(this, trashData);
         }
-        public JFSFileBase[] GetSharedFiles()
+        public JFSBasicFile[] GetSharedFiles()
         {
             // Return list of shared files.
             // TODO: The list currently includes any deleted shared files also..
             var path = "/" + BUILTIN_DEVICE_NAME + "/Links";
             var searchResultData = FetchObject<JFSData.JFSSearchResultData>(path);
-            JFSFileBase[] files = new JFSFile[searchResultData.Files.Length];
+            JFSBasicFile[] files = new JFSFile[searchResultData.Files.Length];
             for (int i = 0; i < searchResultData.Files.Length; i++)
             {
                 // Creating file object using the FileBase factory method which will decide between JFSFile, JFSIncompleteFile or JFSCorruptFile.
                 // Special case with path here: The data object (JFSSearchResultData) does not have a path that we can use as parent path for
                 // files, but luckily the incomplete file objects contained in the data object have path member (which is the parent path) already.
-                files[i] = JFSFileBase.Create(this, searchResultData.Files[i], false);
+                files[i] = JFSBasicFile.Manufacture(this, searchResultData.Files[i], false);
             }
             return files;
         }
-        public JFSFileBase[] GetRecentFiles(int maxResults = 10, string sortBy = "updated")
+        public JFSBasicFile[] GetRecentFiles(int maxResults = 10, string sortBy = "updated")
         {
             // Get a list of the n latest files (the server minimum default is 10), optionally sorted.
             // This is a special built-in object on mount point level, appearing as mount point with name "Label",
@@ -262,13 +266,13 @@ namespace JaFS
             };
             var searchResultData = FetchObject<JFSData.JFSSearchResultData>(path, parameters);
             // NB: When limiting results with the "max" parameter then Metadata.NumberOfFiles show the same value as without this limit, so fewer files can be returned!
-            JFSFileBase[] files = new JFSFile[searchResultData.Files.Length];
+            JFSBasicFile[] files = new JFSFile[searchResultData.Files.Length];
             for (int i = 0; i < searchResultData.Files.Length; i++)
             {
                 // Creating file object using the FileBase factory method which will decide between JFSFile, JFSIncompleteFile or JFSCorruptFile.
                 // Special case with path here: The data object (JFSSearchResultData) does not have a path that we can use as parent path for
                 // files, but luckily the incomplete file objects contained in the data object have path member (which is the parent path) already.
-                files[i] = JFSFileBase.Create(this, searchResultData.Files[i], false);
+                files[i] = JFSBasicFile.Manufacture(this, searchResultData.Files[i], false);
             }
             return files;
         }
@@ -786,27 +790,32 @@ namespace JaFS
                 }
             }
         }
-        public string CalculateMD5(FileInfo fileInfo)
+        public static string CalculateMD5(FileInfo fileInfo)
         {
             using (FileStream fileStream = fileInfo.OpenRead())
             {
                 return CalculateMD5(fileStream);
             }
         }
-        private string CalculateMD5(FileStream fileStream)
+        public static string CalculateMD5(FileStream fileStream)
         {
             using (System.Security.Cryptography.MD5 md5 = System.Security.Cryptography.MD5.Create())
             {
                 return BitConverter.ToString(md5.ComputeHash(fileStream)).Replace("-", string.Empty);
             }
         }
-        private string CalculateMD5(byte[] fileData)
+        public static string CalculateMD5(byte[] fileData)
         {
             using (System.Security.Cryptography.MD5 md5 = System.Security.Cryptography.MD5.Create())
             {
                 return BitConverter.ToString(md5.ComputeHash(fileData)).Replace("-", string.Empty);
             }
         }
+        public static string CalculateMD5(string fileContent)
+        {
+            return CalculateMD5(Encoding.UTF8.GetBytes(fileContent));
+        }
+        
         private string CreateMultiPartItem(string contentName, string contentValue, string boundary)
         {
             // Header and content. Append newline before next section, or footer section.
@@ -863,7 +872,11 @@ namespace JaFS
         {
             SetData(data, isCompleteData);
         }
-
+        public virtual void Refresh()
+        {
+            // Load, or re-load, complete data for the current object.
+            FetchCompleteData(FullName);
+        }
         public virtual void FetchCompleteData()
         {
             // Load, or re-load, complete data for the current object.
@@ -1000,7 +1013,7 @@ namespace JaFS
             CheckCompleteData();
             for (ulong i = 0; i < Data.Metadata.NumberOfMountPoints; i++)
             {
-                if (Data.MountPoints[i].Name == mountPointName)
+                if (string.Equals(Data.MountPoints[i].Name, mountPointName, StringComparison.OrdinalIgnoreCase)) // NB: Might as well ignore case since REST API is case insensitive!
                 {
                     if (includeDeleted || Data.MountPoints[i].Deleted == null)
                         return new JFSMountPoint(FileSystem, FullName, Data.MountPoints[i]);
@@ -1117,16 +1130,16 @@ namespace JaFS
         public string OriginalFullName { get { return OriginalParentPath == null ? null : OriginalParentPath + Name; } } // If deleted this contains the original Full path of this object. Never ending with path separator.
         public JFSFolderBase(Jottacloud fileSystem, DataObjectType dataWithPath, bool isCompleteData) : base(fileSystem, dataWithPath, isCompleteData) { }
         public JFSFolderBase(Jottacloud fileSystem, string parentFullName, DataObjectType incompleteDataWithoutPath) : base(fileSystem, parentFullName, incompleteDataWithoutPath) { }
-        public JFSFileBase[] GetFiles(bool includeDeleted = false)
+        public JFSBasicFile[] GetFiles(bool includeDeleted = false)
         {
             // Deleted files that are still in the trash are not returned by default, but argument includeDeleted can be used to include them.
             CheckCompleteData();
-            JFSFileBase[] files = new JFSFileBase[Data.Metadata.NumberOfFiles];
+            JFSBasicFile[] files = new JFSBasicFile[Data.Metadata.NumberOfFiles];
             int counter = 0;
             for (ulong i = 0; i < Data.Metadata.NumberOfFiles; i++)
             {
                 if (includeDeleted || Data.Files[i].Deleted == null)
-                    files[counter++] = JFSFileBase.Create(FileSystem, FullName, Data.Files[i]); // FileBase factory method will decide between JFSFile, JFSIncompleteFile or JFSCorruptFile!
+                    files[counter++] = JFSBasicFile.Manufacture(FileSystem, FullName, Data.Files[i]); // FileBase factory method will decide between JFSFile, JFSIncompleteFile or JFSCorruptFile!
             }
             if (counter != (int)Data.Metadata.NumberOfFiles)
                 Array.Resize(ref files, counter);
@@ -1147,16 +1160,16 @@ namespace JaFS
                 Array.Resize(ref folders, counter);
             return folders;
         }
-        public JFSFileBase GetFile(string name, bool includeDeleted = false)
+        public JFSBasicFile GetFile(string name, bool includeDeleted = false)
         {
             // Deleted files that are still in the trash are not returned by default, but argument includeDeleted can be used to include them.
             CheckCompleteData();
             for (ulong i = 0; i < Data.Metadata.NumberOfFiles; i++)
             {
-                if (Data.Files[i].Name == name) // TODO: Check case insensitive?
+                if (string.Equals(Data.Files[i].Name, name, StringComparison.OrdinalIgnoreCase)) // NB: Might as well ignore case since REST API is case insensitive!
                 {
                     if (includeDeleted || Data.Files[i].Deleted == null)
-                        return JFSFileBase.Create(FileSystem, FullName, Data.Files[i]); // FileBase factory method will decide between JFSFile, JFSIncompleteFile or JFSCorruptFile!
+                        return JFSBasicFile.Manufacture(FileSystem, FullName, Data.Files[i]); // FileBase factory method will decide between JFSFile, JFSIncompleteFile or JFSCorruptFile!
                     else
                         return null;
                 }
@@ -1169,7 +1182,7 @@ namespace JaFS
             CheckCompleteData();
             for (ulong i = 0; i < Data.Metadata.NumberOfFolders; i++)
             {
-                if (Data.Folders[i].Name == name) // TODO: Check case insensitive?
+                if (string.Equals(Data.Folders[i].Name, name, StringComparison.OrdinalIgnoreCase)) // NB: Might as well ignore case since REST API is case insensitive!
                 {
                     if (includeDeleted || Data.Folders[i].Deleted == null)
                         return new JFSFolder(FileSystem, FullName, Data.Folders[i]);
@@ -1278,11 +1291,11 @@ namespace JaFS
             if (FileSystem.AutoFetchCompleteData)
                 FetchCompleteData(); // Re-load the current (parent) folder also, so that it includes information about the new sub-folder?
         }
-        public void DeleteFilePermanently(JFSFileBase file)
+        public void DeleteFilePermanently(JFSBasicFile file)
         {
             DeleteFilePermanently(file.Name);
         }
-        public virtual JFSFileBase UploadFile(string filePath, int TESTING = 1)
+        public virtual JFSBasicFile UploadFile(string filePath, int TESTING = 1)
         {
             // Upload a file to current folder and return the new JFSFile
             FileInfo fileInfo = new FileInfo(filePath);
@@ -1299,7 +1312,7 @@ namespace JaFS
             //newFileData = FileSystem.UploadIfNotAlreadyExists(jfsPath, fileInfo); break;
             */
 
-            var fileObject = JFSFileBase.Create(FileSystem, FullName, newFileData);  // Cannot trust path being present in returned file data!
+            var fileObject = JFSBasicFile.Manufacture(FileSystem, FullName, newFileData);  // Cannot trust path being present in returned file data!
             if (FileSystem.AutoFetchCompleteData)
                 FetchCompleteData(); // Re-load the current (parent) folder for the updated file to be considered (folders keep revision data about files)?
             return fileObject;
@@ -1348,13 +1361,13 @@ namespace JaFS
     public sealed class JFSTrash : JFSNamedAndPathedObject<JFSData.JFSMountPointData>
     {
         public JFSTrash(Jottacloud fileSystem, JFSData.JFSMountPointData completeData) : base(fileSystem, completeData, true) {} // Since trash is not listed on device, we always have to fetch it directly - and then data is always complete!
-        public JFSFileBase[] GetFiles()
+        public JFSBasicFile[] GetFiles()
         {
             CheckCompleteData();
-            JFSFileBase[] files = new JFSFileBase[Data.Metadata.NumberOfFiles];
+            JFSBasicFile[] files = new JFSBasicFile[Data.Metadata.NumberOfFiles];
             for (ulong i = 0; i < Data.Metadata.NumberOfFiles; i++)
             {
-                files[i] = JFSFileBase.Create(FileSystem, FullName, Data.Files[i]); // FileBase factory method will decide between JFSFile, JFSIncompleteFile or JFSCorruptFile!
+                files[i] = JFSBasicFile.Manufacture(FileSystem, FullName, Data.Files[i]); // FileBase factory method will decide between JFSFile, JFSIncompleteFile or JFSCorruptFile!
             }
             return files;
         }
@@ -1386,15 +1399,15 @@ namespace JaFS
                 Array.Resize(ref mountPoints, counter);
             return mountPoints;
         }
-        public JFSFileBase GetFile(string name)
+        public JFSBasicFile GetFile(string name)
         {
             // Deleted files that are still in the trash are not returned by default, but argument includeDeleted can be used to include them.
             CheckCompleteData();
             for (ulong i = 0; i < Data.Metadata.NumberOfFiles; i++)
             {
-                if (Data.Files[i].Name == name) // TODO: Check case insensitive?
+                if (string.Equals(Data.Files[i].Name, name, StringComparison.OrdinalIgnoreCase)) // NB: Might as well ignore case since REST API is case insensitive!
                 {
-                    return JFSFileBase.Create(FileSystem, FullName, Data.Files[i]); // FileBase factory method will decide between JFSFile, JFSIncompleteFile or JFSCorruptFile!
+                    return JFSBasicFile.Manufacture(FileSystem, FullName, Data.Files[i]); // FileBase factory method will decide between JFSFile, JFSIncompleteFile or JFSCorruptFile!
                 }
             }
             return null;
@@ -1405,7 +1418,7 @@ namespace JaFS
             CheckCompleteData();
             for (ulong i = 0; i < Data.Metadata.NumberOfFolders; i++)
             {
-                if (Data.Folders[i].Name == name) // TODO: Check case insensitive?
+                if (string.Equals(Data.Folders[i].Name, name, StringComparison.OrdinalIgnoreCase)) // NB: Might as well ignore case since REST API is case insensitive!
                 {
                     if (!IsMountPointDataObject(Data.Folders[i])) // Skip objects listed in "folders" that are actually mount points!
                         return new JFSFolder(FileSystem, FullName, Data.Folders[i]);
@@ -1421,7 +1434,7 @@ namespace JaFS
             CheckCompleteData();
             for (ulong i = 0; i < Data.Metadata.NumberOfFolders; i++)
             {
-                if (Data.Folders[i].Name == name) // TODO: Check case insensitive?
+                if (string.Equals(Data.Folders[i].Name, name, StringComparison.OrdinalIgnoreCase)) // NB: Might as well ignore case since REST API is case insensitive!
                 {
                     if (Data.Folders[i].OriginalPath == "/" + Data.User + "/" + Data.Device) // Include only objects listed in "folders" that are actually mount points!
                         new JFSMountPoint(FileSystem, FullName, ConvertToMountPointDataObject(Data.Folders[i]));
@@ -1497,7 +1510,7 @@ namespace JaFS
     //
     // Basic file object, base for specialized file objects.
     //
-    public abstract class JFSFileBase : JFSNamedAndPathedObject<JFSData.JFSFileData>
+    public abstract class JFSBasicFile : JFSNamedAndPathedObject<JFSData.JFSFileData>
     {
         public DateTime? Deleted { get { return Data.Deleted; } }
         public bool IsDeleted { get { return Deleted != null; } }
@@ -1506,46 +1519,63 @@ namespace JaFS
         public string OriginalParentPath { get { return Data.OriginalPath != null ? FileSystem.ConvertFromDataPath(Data.OriginalPath) + "/" : null; } } // If deleted this contains the full path to the original parent, since ParentPath is the path within Trash. For deleted files this is present also in incomplete data objects
         public string OriginalFullName { get { return OriginalParentPath == null ? null : OriginalParentPath + Name; } } // If deleted this contains the original Full path of this object. Never ending with path separator.
         public Guid ID { get { return Data.UUID; } }
+        public bool IsNormal { get { return IsNormalFile(Data); } }
+        public bool IsCorrupt { get { return IsCorruptFile(Data); } }
+        public bool IsIncomplete { get { return IsIncompleteFile(Data); } }
         protected override string CreateChildPath(string childName) { throw new InvalidOperationException(); } // Not supported for files!
-        public JFSFileBase(Jottacloud fileSystem, JFSData.JFSFileData dataWithPath, bool isCompleteData) : base(fileSystem, dataWithPath, isCompleteData) { }
-        public JFSFileBase(Jottacloud fileSystem, string parentFullName, JFSData.JFSFileData incompleteDataWithoutPath) : base(fileSystem, parentFullName, incompleteDataWithoutPath) { }
-        public static JFSFileBase Create(Jottacloud fileSystem, string parentFullName, JFSData.JFSFileData data)
+        public JFSBasicFile(Jottacloud fileSystem, JFSData.JFSFileData dataWithPath, bool isCompleteData) : base(fileSystem, dataWithPath, isCompleteData) { }
+        public JFSBasicFile(Jottacloud fileSystem, string parentFullName, JFSData.JFSFileData incompleteDataWithoutPath) : base(fileSystem, parentFullName, incompleteDataWithoutPath) { }
+        public static bool IsNormalFile(JFSData.JFSFileData data)
+        {
+            return data.CurrentRevision != null;
+        }
+        public static bool IsCorruptFile(JFSData.JFSFileData data)
+        {
+            return !IsNormalFile(data) && data.LatestRevision != null && data.LatestRevision.State == JFSData.JFSDataFileState.Corrupt;
+        }
+        public static bool IsIncompleteFile(JFSData.JFSFileData data)
+        {
+            return !IsNormalFile(data) && data.LatestRevision != null && data.LatestRevision.State == JFSData.JFSDataFileState.Incomplete;
+        }
+        public static JFSBasicFile Manufacture(Jottacloud fileSystem, string parentFullName, JFSData.JFSFileData data)
         {
             // Class method to get the correct file class instantiated
             if (data.CurrentRevision != null)
             {
                 // A normal file
-                return new JFSFile(fileSystem, parentFullName, data);
-            }
-            else if (data.LatestRevision != null)
-            {
-                if (data.LatestRevision.State == JFSData.JFSDataFileState.Incomplete)
-                {
-                    return new JFSIncompleteFile(fileSystem, parentFullName, data);
-                }
-                else if (data.LatestRevision.State == JFSData.JFSDataFileState.Corrupt)
-                {
-                    return new JFSCorruptFile(fileSystem, parentFullName, data);
-                }
-                else
-                {
-                    throw new NotImplementedException(String.Format("No JFS*File support for state %d. Please file a bug!", data.LatestRevision.State));
-                }
+                return ManufactureFromCurrentVersion(fileSystem, parentFullName, data);
             }
             else
             {
-                throw new NotImplementedException("Missing revision for JFS*File. Please file a bug!");
+                // A corrupt or incomplete file
+                return ManufactureFromLatestVersion(fileSystem, parentFullName, data);
             }
         }
-        public static JFSFileBase Create(Jottacloud fileSystem, JFSData.JFSFileData dataWithPath, bool isCompleteData)
+        public static JFSBasicFile Manufacture(Jottacloud fileSystem, JFSData.JFSFileData dataWithPath, bool isCompleteData)
         {
             // Class method to get the correct file class instantiated
             if (dataWithPath.CurrentRevision != null)
             {
                 // A normal file
-                return new JFSFile(fileSystem, dataWithPath, isCompleteData);
+                return ManufactureFromCurrentVersion(fileSystem, dataWithPath, isCompleteData);
             }
-            else if (dataWithPath.LatestRevision != null)
+            else
+            {
+                // A corrupt or incomplete file
+                return ManufactureFromLatestVersion(fileSystem, dataWithPath, isCompleteData);
+            }
+        }
+        protected static JFSFile ManufactureFromCurrentVersion(Jottacloud fileSystem, JFSData.JFSFileData dataWithPath, bool isCompleteData)
+        {
+            return new JFSFile(fileSystem, dataWithPath, isCompleteData);
+        }
+        protected static JFSFile ManufactureFromCurrentVersion(Jottacloud fileSystem, string parentFullName, JFSData.JFSFileData data)
+        {
+            return new JFSFile(fileSystem, parentFullName, data);
+        }
+        protected static JFSCorruptFile ManufactureFromLatestVersion(Jottacloud fileSystem, JFSData.JFSFileData dataWithPath, bool isCompleteData)
+        {
+            if (dataWithPath.LatestRevision != null)
             {
                 if (dataWithPath.LatestRevision.State == JFSData.JFSDataFileState.Incomplete)
                 {
@@ -1557,13 +1587,84 @@ namespace JaFS
                 }
                 else
                 {
-                    throw new NotImplementedException(string.Format("No JFS*File support for state %d. Please file a bug!", dataWithPath.LatestRevision.State));
+                    throw new NotImplementedException(string.Format("No JFSFile support for state %d. Please file a bug!", dataWithPath.LatestRevision.State));
                 }
             }
             else
             {
-                throw new NotImplementedException("Missing revision for JFS*File. Please file a bug!");
+                throw new NotImplementedException("Missing revision for JFSFile. Please file a bug!");
             }
+        }
+        protected static JFSCorruptFile ManufactureFromLatestVersion(Jottacloud fileSystem, string parentFullName, JFSData.JFSFileData data)
+        {
+            if (data.LatestRevision != null)
+            {
+                if (data.LatestRevision.State == JFSData.JFSDataFileState.Incomplete)
+                {
+                    return new JFSIncompleteFile(fileSystem, parentFullName, data);
+                }
+                else if (data.LatestRevision.State == JFSData.JFSDataFileState.Corrupt)
+                {
+                    return new JFSCorruptFile(fileSystem, parentFullName, data);
+                }
+                else
+                {
+                    throw new NotImplementedException(String.Format("No JFSFile support for state %d. Please file a bug!", data.LatestRevision.State));
+                }
+            }
+            else
+            {
+                throw new NotImplementedException("Missing revision for JFSFile. Please file a bug!");
+            }
+        }
+
+        protected JFSBasicFile VerifyRemote(FileInfo fileInfo, string md5Hash)
+        {
+            // Check if the specified local file with a specified MD5 hash is matching the current version on server.
+            var newFileData = FileSystem.VerifyFile(FullName, fileInfo, md5Hash);  // If match, it returns the JFSFileData of the matching item.
+            if (newFileData != null)
+            {
+                // This means there was a match, and we have gotten back the data for the match.
+                // TODO: Can we assume this has the same state as the current, and just update the current data (to get updated timestamps etc)?
+                //       Or should we return a newly manufactured file object to make sure it is of the correct type?
+                //SetData(newFileData); // Replace existing data object with the new one!
+                return Manufacture(FileSystem, newFileData, true);
+            }
+            else
+                return null; // No match!
+        }
+        public JFSBasicFile VerifyRemote(string filePath)
+        {
+            // Check if the specified local file is matching the current version on server.
+            FileInfo fileInfo = new FileInfo(filePath);
+            string md5Hash = Jottacloud.CalculateMD5(fileInfo);
+            return VerifyRemote(fileInfo, md5Hash);
+        }
+        public JFSBasicFile VerifyRemote(string filePath, string md5Hash)
+        {
+            // Check if the specified local file with a specified MD5 hash is matching the current version on server.
+            FileInfo fileInfo = new FileInfo(filePath);
+            return VerifyRemote(fileInfo, md5Hash);
+        }
+        public JFSBasicFile Update(string filePath)
+        {
+            // Put, possibly replace, file contents with (new) data - but check first if it matches the existing file!
+            FileInfo fileInfo = new FileInfo(filePath);
+            var newFileData = FileSystem.UploadIfNotAlreadyExists(FullName, fileInfo);  // Returns the new JFSFileData, which is complete!
+            // NB: We cannot just update the current data, since the new upload might be of a different state (e.g. uploaded an incomplete file and get a complete file back)!
+            //     SetData(newFileData); // Replace existing data object with the new one!
+            return Manufacture(FileSystem, newFileData, true); // Return entirely new object!
+            // NB: Any parent objects (folder) that the client keeps needs to be refreshed for the updated file to be considered (folders keep revision data about files)!
+        }
+        public JFSBasicFile Write(string filePath)
+        {
+            // Put, possibly replace, file contents with (new) data.
+            FileInfo fileInfo = new FileInfo(filePath);
+            var newFileData = FileSystem.UploadSimple(FullName, fileInfo);  // Returns the new JFSFileData, which is complete!
+            // NB: We cannot just update the current data, since the new upload might be of a different state (e.g. uploaded an incomplete file and get a complete file back)!
+            //     SetData(newFileData); // Replace existing data object with the new one!
+            return Manufacture(FileSystem, newFileData, true); // Return entirely new object!
+            // NB: Any parent objects (folder) that the client keeps needs to be refreshed for the updated file to be considered (folders keep revision data about files)!
         }
     }
 
@@ -1579,7 +1680,7 @@ namespace JaFS
     // or may not have an MD5 hash (currently it seems uploading with hash mismatch actually stores the supplied
     // MD5).
     //
-    public class JFSCorruptFile : JFSFileBase
+    public class JFSCorruptFile : JFSBasicFile
     {
         public virtual ulong RevisionNumber { get { return Data.LatestRevision.Number; } }
         public virtual DateTime? Created { get { return Data.LatestRevision.Created.DateTime; } }
@@ -1590,10 +1691,14 @@ namespace JaFS
         public virtual JFSData.JFSDataFileState State { get { return Data.LatestRevision.State; } }
         public long NumberOfVersions { get { return (HasPreviousCompletedVersion ? 2 : 1) + (Data.OldRevisions != null ? Data.OldRevisions.Length : 0); } } // This, the LatestRevision counts 1. If there is a previous completed version it counts +1. And if there are more old revisions they count as well.
         public bool HasPreviousCompletedVersion { get { return Data.CurrentRevision != null; } }
-        public JFSFile GetCompletedVersion() { return HasPreviousCompletedVersion ? new JFSFile(FileSystem, Data, CompleteData) : null; }
+        public JFSFile GetCompletedVersion() { return HasPreviousCompletedVersion ? ManufactureFromCurrentVersion(FileSystem, Data, CompleteData) : null; }
         public JFSFile GetOldVersion(int steps = 1) { throw new NotImplementedException(); }
         public JFSCorruptFile(Jottacloud fileSystem, JFSData.JFSFileData dataWithPath, bool isCompleteData) : base(fileSystem, dataWithPath, isCompleteData) { }
         public JFSCorruptFile(Jottacloud fileSystem, string parentFullName, JFSData.JFSFileData incompleteDataWithoutPath) : base(fileSystem, parentFullName, incompleteDataWithoutPath) {}
+        public bool VerifyLocal(string filePath) { return VerifyLocal(new FileInfo(filePath)); } // Check if the specified local file is matching the current item (not checking upstream).
+        public bool VerifyLocal(FileInfo fileInfo) { return MD5 != null && Jottacloud.CalculateMD5(fileInfo) == MD5; } // Check if the specified local file is matching the current item (not checking upstream).
+        protected JFSBasicFile VerifyRemoteExistingHash(FileInfo fileInfo) { if (MD5 == null) throw new InvalidOperationException("MD5 hash missing for current file item!"); return VerifyRemote(fileInfo, MD5); }
+        private JFSBasicFile VerifyRemoteExistingHash(string filePath) { return VerifyRemoteExistingHash(new FileInfo(filePath)); }
     }
 
     //
@@ -1608,28 +1713,24 @@ namespace JaFS
         public virtual string Size { get { return Data.LatestRevision.Size.ToString(); } }
         public JFSIncompleteFile(Jottacloud fileSystem, JFSData.JFSFileData dataWithPath, bool isCompleteData) : base(fileSystem, dataWithPath, isCompleteData) { }
         public JFSIncompleteFile(Jottacloud fileSystem, string parentFullName, JFSData.JFSFileData incompleteDataWithoutPath) : base(fileSystem, parentFullName, incompleteDataWithoutPath) { }
-        public void Resume(string filePath)
+        public JFSBasicFile Resume(string filePath)
         {
-            // Resume uploading an incomplete file, after a previous upload was interrupted. Returns new file object.
-            // TODO: Handle size -1 like jottalib?
-            //    If self.size === -1, it means we never got the value from the server.
-            //    This is perfectly normal if the file was instatiated via e.g. a file listing,
-            //    and not directly via JFS.getObject()
-            //    if size == -1:
-            //       log.debug('%r is an incomplete file, but .size is unknown. Refreshing the file object from server', self.path)
-            //       self.f = self.jfs.get(self.path)
-            
+            if (!CompleteData)
+            {
+                throw new InvalidOperationException("Complete data needed for this operation, call .FetchCompleteData() and try again!");
+            }
             // Check if what we're asked to upload is actually the right file
             FileInfo fileInfo = new FileInfo(filePath);
-            string md5Hash = FileSystem.CalculateMD5(fileInfo);
-            if (MD5 != md5Hash)
+            if (VerifyLocal(fileInfo))
             {
+                // Upload from offset according to existing size
+                var newFileData = FileSystem.UploadSimple(FullName, fileInfo, (long)SizeInBytes); // Returns the new JFSFileData, which is complete!
+                // NB: We cannot just update the current data, since the new upload might be of a different state (e.g. uploaded an incomplete file and get a complete file back)!
+                //     SetData(newFileData); // Replace existing data object with the new one!
+                return Manufacture(FileSystem, newFileData, true); // Return entirely new object!
+                // NB: Any parent objects (folder) that the client keeps needs to be refreshed for the updated file to be considered (folders keep revision data about files)!
+            } else
                 throw new JFSError("MD5 hashes don't match! Are you trying to resume with the wrong file?");
-            }
-            // Upload from offset according to existing size
-            var newFileData = FileSystem.UploadMultipart(FullName, fileInfo, (long)SizeInBytes); // Returns the new JFSFileData, which is complete!
-            SetData(newFileData); // Replace existing data object with the new one!
-            // NB: Any parent objects (folder) that the client keeps needs to be refreshed for the updated file to be considered (folders keep revision data about files)!
         }
     }
 
@@ -1653,6 +1754,8 @@ namespace JaFS
         public override string MD5 { get { return Data.CurrentRevision.MD5; } }
         public override System.Net.Mime.ContentType Mime { get { return Data.CurrentRevision.Mime.Mime; } }
         public override JFSData.JFSDataFileState State { get { return Data.CurrentRevision.State; } }
+        public bool HasNewerCorruptVersion { get { return Data.LatestRevision != null; } } // Meaning incomplete or corrupt!
+        public JFSCorruptFile GetLatestVersion() { return HasNewerCorruptVersion ? ManufactureFromLatestVersion(FileSystem, Data, CompleteData) : null; }
         public JFSFile(Jottacloud fileSystem, JFSData.JFSFileData dataWithPath, bool isCompleteData) : base(fileSystem, dataWithPath, isCompleteData) { }
         public JFSFile(Jottacloud fileSystem, string parentFullName, JFSData.JFSFileData incompleteDataWithoutPath) : base(fileSystem, parentFullName, incompleteDataWithoutPath) { }
         public string Read()
@@ -1674,14 +1777,6 @@ namespace JaFS
         {
             // TODO: Is this necessary, and easily possible, with the .NET WebResponse stream?
             throw new NotImplementedException(); // TODO!
-        }
-        public void Write(string filePath)
-        {
-            // Put, possibly replace, file contents with (new) data.
-            FileInfo fileInfo = new FileInfo(filePath);
-            var newFileData = FileSystem.UploadMultipart(FullName, fileInfo);  // Returns the new JFSFileData, which is complete!
-            SetData(newFileData); // Replace existing data object with the new one!
-            // NB: Any parent objects (folder) that the client keeps needs to be refreshed for the updated file to be considered (folders keep revision data about files)!
         }
         public void Share(bool enable = true)
         {

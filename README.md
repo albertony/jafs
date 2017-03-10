@@ -119,14 +119,19 @@ Devices contain mount points. Mount points are more or less just a kind of root 
 device `Jotta` contains some built-in mount points which are used from the official software:
 * `Archive` are a generic file store accessible through in the web user interface only.
 * `Sync` is where the files synchronization with the official desktop client are kept.
-* `Shared` is a special mount point for sharing of files by giving public access using a secret.
+* `Trash` is a temporary storage for files that have been marked as deleted, but not permanently
+erased yet. Jottacloud saves deleted files for a minimum 30 days before permanently deleting them.
+Files and folders from the any of the other mount points will be present here, and also
+deleted custom mount points.
+* `Links` is a special mount point for sharing of files by giving public access using a secret.
 This mount point is not behaving like folder and is therefore excluded by default from the JaFS
 methods that are working with mount points (but can be included with an extra argument).
+* `Shared` is an old mechanism for the sharing logic now in `Links`, i think.
 * `Latest` is also a special mount point, this is for showing recent activity. Also not behaving
 like a folder and excluded by default from the JaFS methods that are working with mount points.
 
 When you in JaFS retrieves mount points on the built-in device you will get `Archive` and `Sync` back.
-The special mount points `Shared` and `Latest` are not by default exposed as mount points, the
+The special mount points `Trash`, `Links` and `Latest` are not by default exposed as mount points, the
 corresponding functionality are handled via dedicated methods instead.
 
 The backup functionality in the official desktop client creates a device specific for your client,
@@ -152,21 +157,35 @@ new folders, rename/move them, delete them into trash or delete them permanently
 
 #### Files
 
-Files are stored in folders (or mount points). You create files by uploading a local file
+Files are stored in folders (or directly on mount points). You create files by uploading a local file
 into a specified path. You can also rename/move files, delete them into trash or delete
 them permanently.
+
+Two important concepts of files in JFS is state and revisions. Jottacloud keeps track of the latest
+successful/completed upload of a file and stores it in a revision named "current revision". Whenever
+there is a unsuccessful upload, e.g. due to hash or size mismatch, it will store it in a revision
+name "latest revision". Any older revisions are stored as "revision". The file revisions have a state
+property telling if it was "Completed", "Incomplete", "Corrupt" (hash mismatch), etc. In JaFS the
+file types are organized as a hierarchy: All files are JFSBasicFile, and then there is derived types
+for corrupt files (JFSCorruptFile), incomplete files (JFSIncompleteFile) and complete files (JFSFile),
+adding more and more features. For example only JFSFile has a `Read` method (you can only download
+content of complete files, and only JFSIncompleteFile has a `resume` method (to continue upload where
+a previous incomplete upload ended). But all files have `Write` method so that you can upload
+new content for it. Note that when you retrieve file objects from containers (such as folders or mount
+points) you will get them as JFSBasicFile, and you will need to cast it 
+
+Jottacloud includes functionality for sharing files, by generating a unique "secret" for it that can
+be used in a special URL for anyone knowing the secret to have access to the file.
 
 Limitations
 ===========
 
-Some of the functions that are not implemented yet:
-* Correct handling of any kind of issues that can occur during file upload.
-* Handling of file versions.
-* Resume upload of incomplete files.
+Some of the functions that are not implemented/completed yet:
 * Restore deleted items from trash.
 * Rename mount points.
 * Rename of devices.
-* Sharing of files by giving public access using a secret.
+* Robust handling of any kind of issues that can occur during file upload.
+* Proper handling of file versions.
 
 Side notes
 ==========
@@ -204,3 +223,4 @@ License
 =======
 
 All code is licensed under GNU Lesser General Public License version 3 (LGPLv3).
+
