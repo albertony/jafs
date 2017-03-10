@@ -26,6 +26,7 @@ namespace JaFS
     {
         private const string JFS_BASE_URL = "https://jfs.jottacloud.com/jfs"; // Previously: "https://www.jottacloud.com/jfs"
         private const string JFS_BASE_URL_UPLOAD = "https://up.jottacloud.com/jfs";
+        private const string JFS_DATE_FORMAT = "yyyy'-'MM'-'dd-'T'HH':'mm':'ssK"; // Similar to the standard round-trip ("O", "o") format, but without decimals. Jottacloud requires this format, or else it will just ignore it and use current date/time!
         public const string BUILTIN_DEVICE_NAME = "Jotta";
         public string ApiVersion { get { return "2.4"; } } // API version. Previously 2.2, against www.jottacloud.com, per 06.03.2017, same as in havardgulldahl/jottalib since October 2014.
         public string LibraryVersion { get { return System.Diagnostics.FileVersionInfo.GetVersionInfo(System.Reflection.Assembly.GetExecutingAssembly().Location).FileVersion; } }
@@ -58,7 +59,19 @@ namespace JaFS
                 //{ "X-JottaAPIVersion", ApiVersion } // Old header name used with API version 2.2, against www.jottacloud.com, per 06.03.2017, same as in havardgulldahl/jottalib since October 2014. github.com/paaland/node-jfs does not use it, but github.com/havardgulldahl/jottalib do!
                 { "x-jftp-version", ApiVersion } // New header name used for API version 2.4. Not required..
             };
-            FetchDataObject();
+            try
+            {
+                FetchDataObject();
+            }
+            catch (WebException we)
+            {
+                HttpWebResponse response = (HttpWebResponse)we.Response;
+                if (response.StatusCode == HttpStatusCode.Unauthorized)
+                {
+                    throw new UnauthorizedAccessException("Authorization with Jottacloud failed, please check that you are using the correct username and password, and try again!");
+                }
+                throw;
+            }
         }
         public Jottacloud(string username, string password) : this(new NetworkCredential(username, password)) { }
         public void Refresh()
@@ -67,7 +80,7 @@ namespace JaFS
         }
         private void FetchDataObject()
         {
-            Data = FetchObject<JFSData.JFSUserData>(""); // Fetch the user object, which is our root level data object.
+            Data = RequestGetObject<JFSData.JFSUserData>(""); // Fetch the user object, which is our root level data object.
         }
         public string[] GetDeviceNames()
         {
@@ -134,7 +147,7 @@ namespace JaFS
             }
             var parameters = new Dictionary<string, string> { { "type", Enum.GetName(typeof(JFSData.JFSDataDeviceType), deviceType).ToUpper() } };
             // NB: Unlike with mount points we cannot create mount points and folder path in the same operation.
-            var deviceData = Post<JFSData.JFSDeviceData>("/" + name, parameters, ExpectedStatus: HttpStatusCode.Created); // Returns the new JFSDevice (seems to be incomplete?). NB: The POST for new device, like for mount points, returns Created state - but it always does this even if it already exists (for mount points we get OK if it already exists).
+            var deviceData = RequestPost<JFSData.JFSDeviceData>("/" + name, parameters, ExpectedStatus: HttpStatusCode.Created); // Returns the new JFSDevice (seems to be incomplete?). NB: The POST for new device, like for mount points, returns Created state - but it always does this even if it already exists (for mount points we get OK if it already exists).
             FetchDataObject(); // Re-load the current (parent) user object also, so that it includes information about the new device!
             return new JFSDevice(this, deviceData, false);
         }
@@ -146,7 +159,7 @@ namespace JaFS
             }
             // Delete device permanently, without possibility to restore from trash!
             var parameters = new Dictionary<string, string> { { "rm", "true" } };
-            var fileData = Post<JFSData.JFSUserData>("/" + name, parameters); // NB: Returns user data!
+            var fileData = RequestPost<JFSData.JFSUserData>("/" + name, parameters); // NB: Returns user data!
             // TODO: The request returns the updated user data object, but currently we reload by sending a normal get request
             FetchDataObject(); // Re-load the current (parent) user object, so that it gets the information that it is now deleted!
         }
@@ -158,7 +171,7 @@ namespace JaFS
             }
             DeleteDevicePermanently(device.Name);
         }
-        public JFSObject FindObject(string path, bool includeDeleted = false)
+        public JFSObject GetObject(string path, bool includeDeleted = false)
         {
             string deviceName, mountPointName, theName;
             string[] folderNames;
@@ -232,7 +245,7 @@ namespace JaFS
         public JFSTrash GetTrash()
         {
             var path = "/" + BUILTIN_DEVICE_NAME + "/Trash";
-            var trashData = FetchObject<JFSData.JFSMountPointData>(path);
+            var trashData = RequestGetObject<JFSData.JFSMountPointData>(path);
             return new JFSTrash(this, trashData);
         }
         public JFSBasicFile[] GetSharedFiles()
@@ -240,7 +253,7 @@ namespace JaFS
             // Return list of shared files.
             // TODO: The list currently includes any deleted shared files also..
             var path = "/" + BUILTIN_DEVICE_NAME + "/Links";
-            var searchResultData = FetchObject<JFSData.JFSSearchResultData>(path);
+            var searchResultData = RequestGetObject<JFSData.JFSSearchResultData>(path);
             JFSBasicFile[] files = new JFSFile[searchResultData.Files.Length];
             for (int i = 0; i < searchResultData.Files.Length; i++)
             {
@@ -264,7 +277,7 @@ namespace JaFS
                 { "sort", sortBy },
                 { "web", "true" }
             };
-            var searchResultData = FetchObject<JFSData.JFSSearchResultData>(path, parameters);
+            var searchResultData = RequestGetObject<JFSData.JFSSearchResultData>(path, parameters);
             // NB: When limiting results with the "max" parameter then Metadata.NumberOfFiles show the same value as without this limit, so fewer files can be returned!
             JFSBasicFile[] files = new JFSFile[searchResultData.Files.Length];
             for (int i = 0; i < searchResultData.Files.Length; i++)
@@ -313,7 +326,7 @@ namespace JaFS
         private Uri CreateUri(string path, ICollection<KeyValuePair<string, string>> queryParameters = null, bool forUpload = false)
         {
             // Joining the file system's base URI with specified path, and adding any query parameters.
-            string pathAndQuery = Uri.EscapeUriString(ConvertToDataPath(path)).Replace("#", "%23"); // We need additional escaping for '#' characters to support that in file names!
+            string pathAndQuery = Uri.EscapeUriString(ConvertToDataPath(path)).Replace("+", "%2B").Replace("#", "%23"); // We need additional escaping for '+' and '#' characters to support that in file names! Uri escapes everything else for us (luckily it uses %20 for escaping space).
             if (queryParameters != null)
             {
                 pathAndQuery += "?";
@@ -332,6 +345,7 @@ namespace JaFS
             request.Method = method.ToString();
             request.Credentials = Credentials;
             //request.ContentType = contentType;
+            request.KeepAlive = false;
             request.UserAgent = "JottacloudFileSystem version " + LibraryVersion;
             foreach (var kv in RequestHeaders)
             {
@@ -347,7 +361,7 @@ namespace JaFS
             //request.Timeout = TODO?
             return request;
         }
-        public string Get(string path, ICollection<KeyValuePair<string, string>> queryParameters = null, ICollection<KeyValuePair<string, string>> additionalHeaders = null)
+        public string RequestGet(string path, ICollection<KeyValuePair<string, string>> queryParameters = null, ICollection<KeyValuePair<string, string>> additionalHeaders = null)
         {
             // Make a GET request for url
             Uri uri = CreateUri(path, queryParameters);
@@ -364,7 +378,7 @@ namespace JaFS
                 }
             }
         }
-        public DataObjectType FetchObject<DataObjectType>(string path, ICollection<KeyValuePair<string, string>> queryParameters = null, ICollection<KeyValuePair<string, string>> additionalHeaders = null)
+        public DataObjectType RequestGetObject<DataObjectType>(string path, ICollection<KeyValuePair<string, string>> queryParameters = null, ICollection<KeyValuePair<string, string>> additionalHeaders = null)
         {
             // Make a GET request for url
             Uri uri = CreateUri(path, queryParameters);
@@ -400,7 +414,7 @@ namespace JaFS
                 }
             }
         }
-        public DataObjectType Post<DataObjectType>(string path, ICollection<KeyValuePair<string, string>> queryParameters = null, ICollection<KeyValuePair<string, string>> additionalHeaders = null, ICollection<KeyValuePair<string, string>> data = null, HttpStatusCode ExpectedStatus = HttpStatusCode.OK)
+        public DataObjectType RequestPost<DataObjectType>(string path, ICollection<KeyValuePair<string, string>> queryParameters = null, ICollection<KeyValuePair<string, string>> additionalHeaders = null, ICollection<KeyValuePair<string, string>> data = null, HttpStatusCode ExpectedStatus = HttpStatusCode.OK)
         {
             // HTTP Post form data (string)
             Uri uri = CreateUri(path, queryParameters);
@@ -455,10 +469,31 @@ namespace JaFS
                 }
             }
         }
+        public void DownloadFile(string remotePath, FileInfo fileInfo)//, ulong from, ulong to)
+        {
+            // Make a GET request for url
+            var queryParameters = new Dictionary<string, string> { { "mode", "bin" } };
+            // For partial download:
+            //    var additionalHeaders = new Dictionary<string, string> { { "Range", string.Format("bytes=%d-%d",from,to-1) } };
+            Uri uri = CreateUri(remotePath, queryParameters);
+            var request = CreateRequest(HttpMethod.Get, uri);//, additionalHeaders);
+            using (HttpWebResponse response = (HttpWebResponse)request.GetResponse())
+            {
+                if (response.StatusCode != HttpStatusCode.OK) //if (response.StatusCode >= HttpStatusCode.InternalServerError)
+                {
+                    throw new JFSError(response.StatusDescription);
+                }
+                using (var inputStream = response.GetResponseStream())
+                using (var outputStream = fileInfo.OpenWrite())
+                {
+                    inputStream.CopyTo(outputStream);
+                }
+            }
+        }
         public JFSData.JFSFileData VerifyFile(string remotePath, FileInfo fileInfo, string md5Hash)
         {
             // Check if there is a file at specified location with same name and MD5 hash as the specified local file!
-            return VerifyFile(remotePath, fileInfo.Length.ToString(), fileInfo.CreationTime.ToUniversalTime().ToString("o"), fileInfo.LastWriteTime.ToUniversalTime().ToString("o"), md5Hash);
+            return VerifyFile(remotePath, fileInfo.Length.ToString(), fileInfo.CreationTimeUtc.ToString(JFS_DATE_FORMAT), fileInfo.LastWriteTimeUtc.ToString(JFS_DATE_FORMAT), md5Hash);
         }
         private JFSData.JFSFileData VerifyFile(string remotePath, string size, string timeCreated, string timeModified, string md5Hash)
         {
@@ -475,56 +510,61 @@ namespace JaFS
             //request.ContentType = "application/octet-stream";
             request.ContentLength = 0;
             // Send request, and read response
-            using (HttpWebResponse response = (HttpWebResponse)request.GetResponse())
+            try
             {
-                // Expecting status code 200 if match was found, and 404 if not.
-                if (response.StatusCode == HttpStatusCode.NotFound)
+                // Expecting status code 200 if match was found, and 404 if not. If 404 it will be thrown as exception so its not enough to test for HttpStatusCode.NotFound.
+                using (HttpWebResponse response = (HttpWebResponse)request.GetResponse())
                 {
-                    return null;
-                }
-                if (response.StatusCode != HttpStatusCode.OK)
-                {
-                    throw new JFSError(response.StatusDescription);
-                }
-                using (StreamReader reader = new StreamReader(response.GetResponseStream()))
-                {
-                    try
+                    if (response.StatusCode != HttpStatusCode.OK)
+                        throw new JFSError(response.StatusDescription);
+
+                    using (StreamReader reader = new StreamReader(response.GetResponseStream()))
                     {
-                        XmlSerializer serializer = new XmlSerializer(typeof(JFSData.JFSFileData));
-#if DEBUG
-                        string responseContent = reader.ReadToEnd();
-                        using (var sreader = new StringReader(responseContent))
-                            return (JFSData.JFSFileData)serializer.Deserialize(sreader);
-#else
-                        return (JFSData.JFSFileData)serializer.Deserialize(reader);
-#endif
-                    }
-                    catch
-                    {
-#if DEBUG
-                        // For debugging, read out the XML response without attempting to deserialize it.
-                        // Since the response stream is not seek-able, we must re-send the original request!
-                        // NB: The original Post request was OK, only the response was not the expected XML,
-                        // but if we re-send the request we might not get the same response!!
-                        string responseContent;
-                        var debugRequest = CreateRequest(HttpMethod.Post, uri, additionalHeaders);
-                        using (HttpWebResponse debugResponse = (HttpWebResponse)debugRequest.GetResponse())
-                        using (StreamReader debugReader = new StreamReader(debugResponse.GetResponseStream()))
+                        try
                         {
-                            responseContent = debugReader.ReadToEnd();
-                        }
+                            XmlSerializer serializer = new XmlSerializer(typeof(JFSData.JFSFileData));
+#if DEBUG
+                            string responseContent = reader.ReadToEnd();
+                            using (var sreader = new StringReader(responseContent))
+                                return (JFSData.JFSFileData)serializer.Deserialize(sreader);
+#else
+                            return (JFSData.JFSFileData)serializer.Deserialize(reader);
 #endif
-                        throw;
+                        }
+                        catch
+                        {
+#if DEBUG
+                            // For debugging, read out the XML response without attempting to deserialize it.
+                            // Since the response stream is not seek-able, we must re-send the original request!
+                            // NB: The original Post request was OK, only the response was not the expected XML,
+                            // but if we re-send the request we might not get the same response!!
+                            string responseContent;
+                            var debugRequest = CreateRequest(HttpMethod.Post, uri, additionalHeaders);
+                            using (HttpWebResponse debugResponse = (HttpWebResponse)debugRequest.GetResponse())
+                            using (StreamReader debugReader = new StreamReader(debugResponse.GetResponseStream()))
+                            {
+                                responseContent = debugReader.ReadToEnd();
+                            }
+#endif
+                            throw;
+                        }
                     }
                 }
             }
+            catch (WebException ex)
+            {
+                HttpWebResponse response = (HttpWebResponse)ex.Response;
+                if (response.StatusCode == HttpStatusCode.NotFound)
+                    return null; // Expected for the case when the file does not exist
+                throw;
+            }
         }
-        public JFSData.JFSFileData UploadIfNotAlreadyExists(string remotePath, FileInfo fileInfo, long offset = 0)
+        public JFSData.JFSFileData UploadIfChanged(string remotePath, FileInfo fileInfo, out bool wasChanged, long offset = 0)
         {
             long fileSize = fileInfo.Length;
             string sizeString = fileSize.ToString();
-            var timeCreated = fileInfo.CreationTime.ToUniversalTime().ToString("o");
-            var timeModified = fileInfo.LastWriteTime.ToUniversalTime().ToString("o");
+            var timeCreated = fileInfo.CreationTimeUtc.ToString(JFS_DATE_FORMAT);
+            var timeModified = fileInfo.LastWriteTimeUtc.ToString(JFS_DATE_FORMAT);
             if (offset < 0)
                 throw new InvalidOperationException("Negative file offset is not valid");
             else if (offset > fileSize)
@@ -538,21 +578,15 @@ namespace JaFS
                 // Check if identical file already exists
                 var fileData = VerifyFile(remotePath, sizeString, timeCreated, timeModified, md5Hash);
                 // Verify that the file is complete and not corrupt
-                JFSData.JFSDataFileState state = JFSData.JFSDataFileState.Processing;
-                if (fileData != null)
+                if (JFSBasicFile.IsCompletedFile(fileData))
                 {
-                    if (fileData.LatestRevision != null)
-                        state = fileData.LatestRevision.State;
-                    else if (fileData.CurrentRevision != null)
-                        state = fileData.CurrentRevision.State;
-                }
-                if (state == JFSData.JFSDataFileState.Completed)
-                {
+                    wasChanged = false;
                     return fileData; // File already exists!
                 }
                 else
                 {
                     // Need to upload it after all!
+                    wasChanged = true;
                     // Move stream back to 0, or specified offset, after the MD5 calculation has used it.
                     fileStream.Seek(offset, SeekOrigin.Begin);
                     // Configure url, query parameters  and request headers
@@ -624,16 +658,14 @@ namespace JaFS
                 throw new InvalidOperationException("Offset is larger than file size");
             using (FileStream fileStream = fileInfo.OpenRead())
             {
-                // Move stream back to 0, or specified offset, after the MD5 calculation has used it.
-                fileStream.Seek(offset, SeekOrigin.Begin);
                 // Configure url, query parameters  and request headers
                 var additionalHeaders = new Dictionary<string, string> { { "JSize", fileSize.ToString() } }; // Required header!
                 if (!noFileTimes)
                 {
                     // Record the local file times when storing on server.
                     // If not the server will just register the current date time when it stores the file.
-                    additionalHeaders.Add("JCreated", fileInfo.CreationTime.ToUniversalTime().ToString("o"));
-                    additionalHeaders.Add("JModified", fileInfo.LastWriteTime.ToUniversalTime().ToString("o"));
+                    additionalHeaders.Add("JCreated", fileInfo.CreationTimeUtc.ToString(JFS_DATE_FORMAT));
+                    additionalHeaders.Add("JModified", fileInfo.LastWriteTimeUtc.ToString(JFS_DATE_FORMAT));
                 }
                 if (!noHashVerification)
                 {
@@ -641,6 +673,8 @@ namespace JaFS
                     // If not, the server will just accept whatever data we give it (as long as it matches the required header JSize), and it will return back the MD5 of it.
                     additionalHeaders.Add("JMd5", CalculateMD5(fileStream));
                 }
+                // Move stream back to 0, or specified offset, after the MD5 calculation has used it (and even if not we must move to any specified offset).
+                fileStream.Seek(offset, SeekOrigin.Begin);
                 var queryParameters = new Dictionary<string, string> { { "umode", "nomultipart" } };
                 Uri uri = CreateUri(path, queryParameters, forUpload: true);
                 var request = CreateRequest(HttpMethod.Post, uri, additionalHeaders);
@@ -711,8 +745,8 @@ namespace JaFS
                 fileStream.Seek(offset, SeekOrigin.Begin);
                 // Configure url, query parameters  and request headers
                 //var deviceName = GetDeviceNameFromPath(path);
-                var timeCreated = fileInfo.CreationTime.ToUniversalTime().ToString("o");
-                var timeModified = fileInfo.LastWriteTime.ToUniversalTime().ToString("o");
+                var timeCreated = fileInfo.CreationTimeUtc.ToString(JFS_DATE_FORMAT);
+                var timeModified = fileInfo.LastWriteTimeUtc.ToString(JFS_DATE_FORMAT);
                 var additionalHeaders = new Dictionary<string, string> {
                     { "JMd5", md5Hash },
                     { "JSize", fileSize.ToString() },
@@ -902,7 +936,7 @@ namespace JaFS
         private void FetchCompleteData(string fullName)
         {
             // Variant for the case where we have no basic data object to fetch the name from, and it required as the last path of the uri.
-            SetData(FileSystem.FetchObject<DataObjectType>(fullName), true); // NB: Always complete data!
+            SetData(FileSystem.RequestGetObject<DataObjectType>(fullName), true); // NB: Always complete data!
         }
     }
 
@@ -954,7 +988,7 @@ namespace JaFS
         private bool IsRegularBuiltinMountPoint(string name) { return IsBuiltInDevice && Array.FindIndex(Enum.GetNames(typeof(BuiltInMountPoints)), x => x.Equals(name, StringComparison.OrdinalIgnoreCase)) != -1; }
         private bool IsSpecialBuiltinMountPoint(string name) { return IsBuiltInDevice && Array.FindIndex(Enum.GetNames(typeof(SpecialBuiltInMountPoints)), x => x.Equals(name, StringComparison.OrdinalIgnoreCase)) != -1; }
 
-        public ulong Total { get { return Data.Metadata.Total; } }
+        public ulong NumberOfObjects { get { return Data.Metadata.Total; } } // TODO: Is this not always the same as NumberOfMountPoints on devices??
         public ulong NumberOfApiMountPoints { get { return Data.Metadata.NumberOfMountPoints; } } // NB: Includes deleted and special mount points!
         public ulong NumberOfRegularMountPoints
         {
@@ -1093,7 +1127,7 @@ namespace JaFS
             // code for success is "OK" (like when creating folders) instead of "Created", and the returned object
             // is the last folder in the path. Could perhaps be a nice feature, but then if we must verify the mount point
             // name we must split the input argument etc..
-            var newMountPointData = FileSystem.Post<JFSData.JFSMountPointData>(url, ExpectedStatus: HttpStatusCode.Created); // Returns the new JFSMountPoint, which is complete (with path) except does not have the metadata element on it!! NB: The POST for new mount point returns Created state if success, and it returns OK if it already exists.
+            var newMountPointData = FileSystem.RequestPost<JFSData.JFSMountPointData>(url, ExpectedStatus: HttpStatusCode.Created); // Returns the new JFSMountPoint, which is complete (with path) except does not have the metadata element on it!! NB: The POST for new mount point returns Created state if success, and it returns OK if it already exists.
             if (FileSystem.AutoFetchCompleteData)
                 FetchCompleteData(); // Re-load the current (parent) device also, so that it includes information about the new mount point?
             return new JFSMountPoint(FileSystem, newMountPointData, true); // NB: We indicate it is complete, although it does not have the metadata child element which it has in result from GET request!
@@ -1111,7 +1145,7 @@ namespace JaFS
             }
             // Delete mount point permanently, without possibility to restore from trash!
             var parameters = new Dictionary<string, string> { { "rm", "true" } };
-            var deviceData = FileSystem.Post<JFSData.JFSDeviceData>(FullName + "/" + name, parameters); // NB: Returns in-complete device data!
+            var deviceData = FileSystem.RequestPost<JFSData.JFSDeviceData>(FullName + "/" + name, parameters); // NB: Returns in-complete device data!
             if (FileSystem.AutoFetchCompleteData)
                 FetchCompleteData(); // Re-load the current (parent) folder also, so that it includes information about the new sub-folder?
         }
@@ -1124,12 +1158,73 @@ namespace JaFS
     //
     // Interface describing the shared logic between mount points and folders.
     //
-    public abstract class JFSFolderBase<DataObjectType> : JFSNamedAndPathedObject<DataObjectType> where DataObjectType : JFSData.JFSFolderBaseData
+    public abstract class JFSBasicFolder<DataObjectType> : JFSNamedAndPathedObject<DataObjectType> where DataObjectType : JFSData.JFSFolderBaseData
     {
         public string OriginalParentPath { get { return Data.OriginalPath != null ? FileSystem.ConvertFromDataPath(Data.OriginalPath) + "/" : null; } } // If deleted this contains the full path to the original parent, since ParentPath is the path within Trash. For deleted folders this is present also in incomplete data objects
         public string OriginalFullName { get { return OriginalParentPath == null ? null : OriginalParentPath + Name; } } // If deleted this contains the original Full path of this object. Never ending with path separator.
-        public JFSFolderBase(Jottacloud fileSystem, DataObjectType dataWithPath, bool isCompleteData) : base(fileSystem, dataWithPath, isCompleteData) { }
-        public JFSFolderBase(Jottacloud fileSystem, string parentFullName, DataObjectType incompleteDataWithoutPath) : base(fileSystem, parentFullName, incompleteDataWithoutPath) { }
+        public ulong NumberOfFilesAndFolders { get { return Data.Metadata != null ? Data.Metadata.Total : 0; } }
+        public ulong NumberOfFolders { get { return Data.Metadata != null ? Data.Metadata.NumberOfFolders : 0; } }
+        public ulong NumberOfFiles { get { return Data.Metadata != null ? Data.Metadata.NumberOfFiles : 0; } }
+
+        public JFSBasicFolder(Jottacloud fileSystem, DataObjectType dataWithPath, bool isCompleteData) : base(fileSystem, dataWithPath, isCompleteData) { }
+        public JFSBasicFolder(Jottacloud fileSystem, string parentFullName, DataObjectType incompleteDataWithoutPath) : base(fileSystem, parentFullName, incompleteDataWithoutPath) { }
+        public string[] GetFileNames(bool includeDeleted = false)
+        {
+            // Deleted files that are still in the trash are not returned by default, but argument includeDeleted can be used to include them.
+            string[] files = new string[Data.Metadata.NumberOfFiles];
+            int counter = 0;
+            for (ulong i = 0; i < Data.Metadata.NumberOfFiles; i++)
+            {
+                if (includeDeleted || Data.Files[i].Deleted == null)
+                    files[counter++] = Data.Files[i].Name;
+            }
+            if (counter != (int)Data.Metadata.NumberOfFiles)
+                Array.Resize(ref files, counter);
+            return files;
+        }
+        public string[] GetFoldersNames(bool includeDeleted = false)
+        {
+            // Deleted folders that are still in the trash are not returned by default, but argument includeDeleted can be used to include them.
+            string[] folders = new string[Data.Metadata.NumberOfFolders];
+            int counter = 0;
+            for (ulong i = 0; i < Data.Metadata.NumberOfFolders; i++)
+            {
+                if (includeDeleted || Data.Folders[i].Deleted == null)
+                    folders[counter++] = Data.Folders[i].Name;
+            }
+            if (counter != (int)Data.Metadata.NumberOfFolders)
+                Array.Resize(ref folders, counter);
+            return folders;
+        }
+        public bool ContainsFile(string name, bool includeDeleted = false)
+        {
+            // Deleted files that are still in the trash are not returned by default, but argument includeDeleted can be used to include them.
+            for (ulong i = 0; i < Data.Metadata.NumberOfFiles; i++)
+            {
+                if (string.Equals(Data.Files[i].Name, name, StringComparison.OrdinalIgnoreCase)) // NB: Might as well ignore case since REST API is case insensitive!
+                {
+                    if (includeDeleted || Data.Files[i].Deleted == null)
+                        return true;
+                    // else: return false? Meaning two files with same cannot exist at the same time, one being deleted and the other not??
+                }
+            }
+            return false;
+        }
+        public bool ContainsFolder(string name, bool includeDeleted = false)
+        {
+            // Deleted folders that are still in the trash are not returned by default, but argument includeDeleted can be used to include them.
+            for (ulong i = 0; i < Data.Metadata.NumberOfFolders; i++)
+            {
+                if (string.Equals(Data.Folders[i].Name, name, StringComparison.OrdinalIgnoreCase)) // NB: Might as well ignore case since REST API is case insensitive!
+                {
+                    if (includeDeleted || Data.Folders[i].Deleted == null)
+                        return true;
+                    // else: return false? Meaning two folder with same cannot exist at the same time, one being deleted and the other not??
+                }
+            }
+            return false;
+        }
+
         public JFSBasicFile[] GetFiles(bool includeDeleted = false)
         {
             // Deleted files that are still in the trash are not returned by default, but argument includeDeleted can be used to include them.
@@ -1207,7 +1302,7 @@ namespace JaFS
             // The incomplete file data contains MD5 hash, but corrupt files does not have this set. Also incomplete files
             // does not have the size property set when fetched from FileDirList, must fetch complete data to get this.
             var queryParameters = new Dictionary<string, string> { { "mode", "list" } };
-            var fileDirDataObject = FileSystem.FetchObject<JFSData.JFSFileDirListData>(FullName, queryParameters);
+            var fileDirDataObject = FileSystem.RequestGetObject<JFSData.JFSFileDirListData>(FullName, queryParameters);
             // Build a simple file tree using basic information from the FileDirList.
             // Representing it as a map containing all files (no folders), where the path is the key and
             // a basic structure with {name, size, md5, uuid, state} is the value.
@@ -1233,21 +1328,21 @@ namespace JaFS
                         if (fileData.LatestRevision.State == JFSData.JFSDataFileState.Incomplete)
                         {
                             // A incomplete file: Get info from LatestRevision. Size is missing when fetching data from JFSFileDirList.
-                            folderFiles[j] = new JFSFileSystemInfo(fileData.Name, fileData.UUID, fileData.CurrentRevision.State, null, fileData.CurrentRevision.MD5);
+                            folderFiles[j] = new JFSFileSystemInfo(fileData.Name, fileData.UUID, fileData.LatestRevision.State, null, fileData.LatestRevision.MD5);
                         }
                         else if (fileData.LatestRevision.State == JFSData.JFSDataFileState.Corrupt)
                         {
                             // A corrupt file: Get info from LatestRevision. Size and MD5 is missing.
-                            folderFiles[j] = new JFSFileSystemInfo(fileData.Name, fileData.UUID, fileData.CurrentRevision.State, null, null);
+                            folderFiles[j] = new JFSFileSystemInfo(fileData.Name, fileData.UUID, fileData.LatestRevision.State, null, null);
                         }
                         else
                         {
-                            throw new NotImplementedException(String.Format("No JFS*File support for state %d. Please file a bug!", fileData.LatestRevision.State));
+                            throw new NotImplementedException(String.Format("No JFSFile support for state %d. Please file a bug!", fileData.LatestRevision.State));
                         }
                     }
                     else
                     {
-                        throw new NotImplementedException("Missing revision for JFS*File. Please file a bug!");
+                        throw new NotImplementedException("Missing revision for JFSFile. Please file a bug!");
                     }
                 }
                 fileTree.Add(new KeyValuePair<string, JFSFileSystemInfo[]>(folderPath, folderFiles));
@@ -1261,10 +1356,11 @@ namespace JaFS
             // TODO: Does not check if it already exists, then the  existing folder will be returned.
             var parameters = new Dictionary<string, string> { { "mkDir", "true" } };
             var path = CreateChildPath(nameOrSubfolderPath);
-            var newFolderData = FileSystem.Post<JFSData.JFSFolderData>(path, parameters); // Returns the new JFSFolderData, which is complete (with path) except does not have the metadata element on it!! NB: The POST request for new folder returns OK if success but also if it already exists!
+            var newFolderData = FileSystem.RequestPost<JFSData.JFSFolderData>(path, parameters); // Returns the new JFSFolderData, which is complete (with path) except does not have the metadata element on it!! NB: The POST request for new folder returns OK if success but also if it already exists!
             if (FileSystem.AutoFetchCompleteData)
                 FetchCompleteData(); // Re-load the current (parent) folder also, so that it includes information about the new sub-folder?
-            return new JFSFolder(FileSystem, newFolderData, true); // NB: We indicate it is complete, although it does not have the metadata child element which it has in result from GET request!
+            newFolderData.Metadata = new JFSData.JFSFolderMetaData() { First = 0, Max = 0, Total = 0, NumberOfFiles = 0, NumberOfFolders = 0 }; // The data object is almost complete, but without metadata so we create it here!
+            return new JFSFolder(FileSystem, newFolderData, true); // NB: We indicate it is complete, since we have created the metadata which it did not have in the result from GET request!
         }
         public abstract void Delete();
         public void Restore()
@@ -1275,7 +1371,7 @@ namespace JaFS
         {
             // Delete filer or folder permanently, without possibility to restore from trash!
             var parameters = new Dictionary<string, string> { { "rmDir", "true" } };
-            var mountPointData = FileSystem.Post<JFSData.JFSMountPointData>(FullName + "/" + name, parameters); // NB: Returns (in-complete?) mount point data!
+            var mountPointData = FileSystem.RequestPost<JFSData.JFSMountPointData>(FullName + "/" + name, parameters); // NB: Returns (in-complete?) mount point data!
             if (FileSystem.AutoFetchCompleteData)
                 FetchCompleteData(); // Re-load the current (parent) folder also, so that it includes information about the new sub-folder?
         }
@@ -1287,7 +1383,7 @@ namespace JaFS
         {
             // Delete filer or folder permanently, without possibility to restore from trash!
             var parameters = new Dictionary<string, string> { { "rm", "true" } };
-            var newMountPointData = FileSystem.Post<JFSData.JFSMountPointData>(FullName + "/" + name, parameters); // Returns user data
+            var newMountPointData = FileSystem.RequestPost<JFSData.JFSMountPointData>(FullName + "/" + name, parameters); // Returns user data
             if (FileSystem.AutoFetchCompleteData)
                 FetchCompleteData(); // Re-load the current (parent) folder also, so that it includes information about the new sub-folder?
         }
@@ -1295,27 +1391,178 @@ namespace JaFS
         {
             DeleteFilePermanently(file.Name);
         }
-        public virtual JFSBasicFile UploadFile(string filePath, int TESTING = 1)
+        public virtual JFSBasicFile UploadFile(string filePath)
         {
             // Upload a file to current folder and return the new JFSFile
             FileInfo fileInfo = new FileInfo(filePath);
             string jfsPath = FullName + "/" + fileInfo.Name;
-            var newFileData = FileSystem.UploadMultipart(jfsPath, fileInfo); // Returns the new JFSFileData, which is not complete because it often misses the path element event!?
-
-            /*
-            For testing different upload methods!
-            JFSData.JFSFileData newFileData = null;
-            newFileData = FileSystem.UploadSimple(jfsPath, fileInfo, 0, true);
-            newFileData = FileSystem.UploadSimple(jfsPath, fileInfo, 0, false);
-            newFileData = FileSystem.UploadMultipart(jfsPath, fileInfo, 0, true);
-            newFileData = FileSystem.UploadMultipart(jfsPath, fileInfo, 0, true);
-            //newFileData = FileSystem.UploadIfNotAlreadyExists(jfsPath, fileInfo); break;
-            */
-
+            var newFileData = FileSystem.UploadSimple(jfsPath, fileInfo); // Returns the new JFSFileData, which is not complete because it often misses the path element event!?
             var fileObject = JFSBasicFile.Manufacture(FileSystem, FullName, newFileData);  // Cannot trust path being present in returned file data!
             if (FileSystem.AutoFetchCompleteData)
                 FetchCompleteData(); // Re-load the current (parent) folder for the updated file to be considered (folders keep revision data about files)?
             return fileObject;
+        }
+        private void UploadFolder(DirectoryInfo localFolderInfo, bool recurseSubfolders, bool skipIdenticalFiles, string remoteParentPath, bool abortIfFolderExists, ref ulong numberOfFilesProcessed, ref ulong numberOfFilesUploaded, Action<string> logMessageCallback)
+        {
+            if (!localFolderInfo.Exists)
+            {
+                throw new InvalidOperationException("The specified local folder does not exists!");
+            }
+            CheckCompleteData();
+            JFSFolder jfsFolder = null;
+            if (ContainsFolder(localFolderInfo.Name))
+            {
+                if (abortIfFolderExists)
+                    throw new InvalidOperationException("Folder with same name already exists!");
+                jfsFolder = GetFolder(localFolderInfo.Name);
+                jfsFolder.FetchCompleteData();
+                if (logMessageCallback != null) logMessageCallback("Existing folder " + jfsFolder.FullName);
+            }
+            else
+            {
+                jfsFolder = NewFolder(localFolderInfo.Name);
+                logMessageCallback?.Invoke("Created folder " + jfsFolder.FullName);
+            }
+            if (recurseSubfolders)
+            {
+                foreach (var subFolderInfo in localFolderInfo.GetDirectories())
+                {
+                    jfsFolder.UploadFolder(subFolderInfo, recurseSubfolders, skipIdenticalFiles, remoteParentPath + subFolderInfo.Name + "/", false, ref numberOfFilesProcessed, ref numberOfFilesUploaded, logMessageCallback); // Argument abortIfFolderExists makes no sense in the recursion
+                }
+            }
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            foreach (var fileInfo in localFolderInfo.GetFiles())
+            {
+                string jfsPath = jfsFolder.FullName + "/" + fileInfo.Name;
+                JFSData.JFSFileData result = null;
+                if (skipIdenticalFiles) {
+                    bool wasChanged;
+                    stopwatch.Restart();
+                    result = FileSystem.UploadIfChanged(jfsPath, fileInfo, out wasChanged);
+                    stopwatch.Stop();
+                    if (wasChanged) {
+                        numberOfFilesUploaded++;
+                        logMessageCallback?.Invoke(string.Format("Uploaded new or changed file {0} [{1}] in {2}", jfsPath, JFSData.JFSDataUtilities.HumanizeDataSize((ulong)fileInfo.Length), stopwatch.Elapsed));
+                    } else
+                        logMessageCallback?.Invoke(string.Format("Verified existing file {0} [{1}] in {2}", jfsPath, JFSData.JFSDataUtilities.HumanizeDataSize((ulong)fileInfo.Length), stopwatch.Elapsed));
+                }
+                else {
+                    stopwatch.Restart();
+                    result = FileSystem.UploadSimple(jfsPath, fileInfo); // Returns the new JFSFileData, which is not complete because it often misses the path element event!?
+                    stopwatch.Stop();
+                    numberOfFilesUploaded++;
+                    logMessageCallback?.Invoke(string.Format("Uploaded file {0} [{1}] in {2}", jfsPath, JFSData.JFSDataUtilities.HumanizeDataSize((ulong)fileInfo.Length), stopwatch.Elapsed));
+                }
+                if (!JFSBasicFile.IsCompletedFile(result))
+                    throw new InvalidOperationException("Upload to " + jfsPath + " filed!");
+                numberOfFilesProcessed++;
+            }
+        }
+        public void UploadFolder(string localFolderPath, bool recurseSubfolders, bool skipIdenticalFiles, bool abortIfFolderExists, Action<string> logMessageCallback, ref ulong numberOfFilesProcessed, ref ulong numberOfFilesUploaded)
+        {
+            UploadFolder(new DirectoryInfo(localFolderPath), recurseSubfolders, skipIdenticalFiles, FullName + "/", abortIfFolderExists, ref numberOfFilesProcessed, ref numberOfFilesUploaded, logMessageCallback);
+            if (FileSystem.AutoFetchCompleteData)
+                FetchCompleteData(); // Re-load the current (parent) folder for the updated file to be considered (folders keep revision data about files)?
+            logMessageCallback(string.Format("{0} files processed: {1} files uploaded / {2} files up to date", numberOfFilesProcessed, numberOfFilesUploaded, numberOfFilesProcessed - numberOfFilesUploaded));
+        }
+        public void UploadFolder(string localFolderPath, bool recurseSubfolders, bool skipIdenticalFiles, bool abortIfFolderExists)
+        {
+            ulong numberOfFilesProcessed = 0, numberOfFilesUploaded = 0;
+            UploadFolder(new DirectoryInfo(localFolderPath), recurseSubfolders, skipIdenticalFiles, FullName + "/", abortIfFolderExists, ref numberOfFilesProcessed, ref numberOfFilesUploaded, null);
+            if (FileSystem.AutoFetchCompleteData)
+                FetchCompleteData(); // Re-load the current (parent) folder for the updated file to be considered (folders keep revision data about files)?
+        }
+        public void Download(DirectoryInfo localFolderInfo, bool recurseSubfolders, bool skipIdenticalFiles, bool abortIfFolderExists, ref ulong numberOfFilesProcessed, ref ulong numberOfFilesDownloaded, Action<string> logMessageCallback)
+        {
+            if (abortIfFolderExists && skipIdenticalFiles)
+            {
+                throw new ArgumentException("Cannot both check for existing files and abort if folder already exist!");
+            }
+            // Download the current folder into the specified local folder (so current folder will be child of the specified local folder!).
+            CheckCompleteData();
+            // Check if the local folder exists
+            if (localFolderInfo.Exists)
+            {
+                if (abortIfFolderExists)
+                    throw new InvalidOperationException("The specified local folder already exist!");
+            }
+            else
+            {
+                localFolderInfo.Create();
+                logMessageCallback?.Invoke("Created folder " + localFolderInfo.FullName);
+            }
+            // Create the current folder
+            localFolderInfo = new DirectoryInfo(localFolderInfo.FullName + "\\" + this.Name);
+            if (!localFolderInfo.Exists)
+            {
+                localFolderInfo.Create();
+                logMessageCallback?.Invoke("Created folder " + localFolderInfo.FullName);
+            }
+            // Recurse subfolders
+            if (recurseSubfolders)
+            {
+                foreach (var jfsFolder in GetFolders())
+                {
+                    jfsFolder.FetchCompleteData();
+                    jfsFolder.Download(localFolderInfo, recurseSubfolders, skipIdenticalFiles, false, ref numberOfFilesProcessed, ref numberOfFilesDownloaded, logMessageCallback); // Argument abortIfFolderExists makes no sense in the recursion
+                }
+            }
+            // Process files
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            foreach (var jfsBasicFile in GetFiles())
+            {
+                if (jfsBasicFile.IsCompleted)
+                {
+                    var jfsFile = jfsBasicFile as JFSFile;
+                    jfsFile.FetchCompleteData();
+                    FileInfo localFileInfo = new FileInfo(localFolderInfo.FullName + "\\" + jfsFile.Name);
+                    if (localFileInfo.Exists && skipIdenticalFiles)
+                    {
+                        stopwatch.Restart();
+                        bool wasChanged = jfsFile.UpdateLocal(localFileInfo);
+                        stopwatch.Stop();
+                        if (wasChanged)
+                        {
+                            numberOfFilesDownloaded++;
+                            if (logMessageCallback != null)
+                            {
+                                localFileInfo.Refresh(); // Need to re-load information after file has been created to get the Length property!
+                                logMessageCallback?.Invoke(string.Format("Downloaded new or changed file {0} from {1} [{2}] in {3}", localFileInfo.FullName, jfsFile.FullName, JFSData.JFSDataUtilities.HumanizeDataSize((ulong)localFileInfo.Length), stopwatch.Elapsed));
+                            }
+                        }
+                        else
+                            logMessageCallback?.Invoke(string.Format("Verified existing file {0} from {1} [{2}] in {3}", localFileInfo.FullName, jfsFile.FullName, JFSData.JFSDataUtilities.HumanizeDataSize((ulong)localFileInfo.Length), stopwatch.Elapsed));
+                    }
+                    else
+                    {
+                        stopwatch.Restart();
+                        jfsFile.Download(localFileInfo, true);
+                        stopwatch.Stop();
+                        numberOfFilesDownloaded++;
+                        if (logMessageCallback != null)
+                        {
+                            localFileInfo.Refresh(); // Need to re-load information after file has been created to get the Length property!
+                            logMessageCallback.Invoke(string.Format("Downloaded file {0} from {1} [{2}] in {3}", localFileInfo.FullName, jfsFile.FullName, JFSData.JFSDataUtilities.HumanizeDataSize((ulong)localFileInfo.Length), stopwatch.Elapsed));
+                        }
+                    }
+                    numberOfFilesProcessed++;
+                }
+                else
+                {
+                    logMessageCallback?.Invoke(string.Format("Skipping file {0} because remote file {1} it is not complete", jfsBasicFile.FullName, jfsBasicFile.FullName));
+                }
+            }
+        }
+
+        public void Download(string localFolderPath, bool recurseSubfolders, bool skipIdenticalFiles, bool abortIfFolderExists, ref ulong numberOfFilesProcessed, ref ulong numberOfFilesDownloaded, Action<string> logMessageCallback)
+        {
+            Download(new DirectoryInfo(localFolderPath), recurseSubfolders, skipIdenticalFiles, abortIfFolderExists, ref numberOfFilesProcessed, ref numberOfFilesDownloaded, logMessageCallback);
+            logMessageCallback(string.Format("{0} files processed: {1} files uploaded / {2} files up to date", numberOfFilesProcessed, numberOfFilesDownloaded, numberOfFilesProcessed - numberOfFilesDownloaded));
+        }
+        public void Download(string localFolderPath, bool recurseSubfolders, bool skipIdenticalFiles, bool abortIfFolderExists)
+        {
+            ulong numberOfFilesProcessed = 0, numberOfFilesUploaded = 0;
+            Download(new DirectoryInfo(localFolderPath), recurseSubfolders, skipIdenticalFiles, abortIfFolderExists, ref numberOfFilesProcessed, ref numberOfFilesUploaded, null);
         }
     }
 
@@ -1326,7 +1573,7 @@ namespace JaFS
     // devices (which is for the backup feature). The special mount points "Latest" and "Share" are handled by their
     // own specialized classes, since they cannot be used with regular file operations.
     //
-    public sealed class JFSMountPoint : JFSFolderBase<JFSData.JFSMountPointData>
+    public sealed class JFSMountPoint : JFSBasicFolder<JFSData.JFSMountPointData>
     {
         public DateTime? Deleted { get { if (Data.Deleted != null) return Data.Deleted.DateTime; return null; } }
         public bool IsDeleted { get { return Deleted != null; } }
@@ -1341,7 +1588,7 @@ namespace JaFS
         {
             // Delete this mount point and return a deleted JFSMountPoint.
             var parameters = new Dictionary<string, string> { { "dl", "true" } };
-            var newMountPointData = FileSystem.Post<JFSData.JFSMountPointData>(FullName, parameters); // Returns the deleted JFSMountPointData, which is complete (and now with a deleted timestamp on it)!
+            var newMountPointData = FileSystem.RequestPost<JFSData.JFSMountPointData>(FullName, parameters); // Returns the deleted JFSMountPointData, which is complete (and now with a deleted timestamp on it)!
             SetData(newMountPointData); // Replace existing data object with the new one!
             // NB: Any parent objects (device), or child objects that have been deleted with this mount point, that the client keeps needs to be refreshed for the delete to be considered!
         }
@@ -1461,7 +1708,7 @@ namespace JaFS
         }
     }
 
-    public sealed class JFSFolder : JFSFolderBase<JFSData.JFSFolderData>
+    public sealed class JFSFolder : JFSBasicFolder<JFSData.JFSFolderData>
     {
         public bool IsDeleted { get { return Data.Deleted != null; } }
         public JFSFolder(Jottacloud fileSystem, JFSData.JFSFolderData dataWithPath, bool isCompleteData) : base(fileSystem, dataWithPath, isCompleteData) { }
@@ -1480,7 +1727,7 @@ namespace JaFS
             // Returns the moved JFSFolder.
             var moveToPath = FileSystem.ConvertToDataPath(newPath); // Convert to data path, appending the file system root name (username).
             var parameters = new Dictionary<string, string> { { "mvDir", moveToPath } };
-            var newFolderData = FileSystem.Post<JFSData.JFSFolderData>(FullName, parameters); // Returns the new JFSFolderData, which is complete (and now with a deleted timestamp on it)!
+            var newFolderData = FileSystem.RequestPost<JFSData.JFSFolderData>(FullName, parameters); // Returns the new JFSFolderData, which is complete (and now with a deleted timestamp on it)!
             SetData(newFolderData); // Replace existing data object with the new one!
             // NB: Any parent objects (folder), or child objects that have been deleted with this folder, that the client keeps needs to be refreshed for the moved to be considered!
         }
@@ -1497,7 +1744,7 @@ namespace JaFS
             }
             // Delete this folder and return a deleted JFSFolder.
             var parameters = new Dictionary<string, string> { { "dlDir", "true" } };
-            var newFolderData = FileSystem.Post<JFSData.JFSFolderData>(FullName, parameters); // Returns the deleted JFSFolderData, which is complete (and now with a deleted timestamp on it)!
+            var newFolderData = FileSystem.RequestPost<JFSData.JFSFolderData>(FullName, parameters); // Returns the deleted JFSFolderData, which is complete (and now with a deleted timestamp on it)!
             SetData(newFolderData); // Replace existing data object with the new one!
             // NB: Any parent objects (folder), or child objects that have been deleted with this folder, that the client keeps needs to be refreshed for the delete to be considered!
         }
@@ -1520,14 +1767,30 @@ namespace JaFS
         public string OriginalFullName { get { return OriginalParentPath == null ? null : OriginalParentPath + Name; } } // If deleted this contains the original Full path of this object. Never ending with path separator.
         public Guid ID { get { return Data.UUID; } }
         public bool IsNormal { get { return IsNormalFile(Data); } }
-        public bool IsCorrupt { get { return IsCorruptFile(Data); } }
+        public bool IsCompleted { get { return IsCompletedFile(Data); } }
         public bool IsIncomplete { get { return IsIncompleteFile(Data); } }
+        public bool IsCorrupt { get { return IsCorruptFile(Data); } }
         protected override string CreateChildPath(string childName) { throw new InvalidOperationException(); } // Not supported for files!
         public JFSBasicFile(Jottacloud fileSystem, JFSData.JFSFileData dataWithPath, bool isCompleteData) : base(fileSystem, dataWithPath, isCompleteData) { }
         public JFSBasicFile(Jottacloud fileSystem, string parentFullName, JFSData.JFSFileData incompleteDataWithoutPath) : base(fileSystem, parentFullName, incompleteDataWithoutPath) { }
         public static bool IsNormalFile(JFSData.JFSFileData data)
         {
             return data.CurrentRevision != null;
+        }
+        public static bool IsCompletedFile(JFSData.JFSFileData data)
+        {
+            return IsNormalFile(data) && data.CurrentRevision != null && data.CurrentRevision.State == JFSData.JFSDataFileState.Completed;
+            /*
+            JFSData.JFSDataFileState state = JFSData.JFSDataFileState.Processing;
+            if (data != null)
+            {
+                if (data.LatestRevision != null)
+                    state = data.LatestRevision.State;
+                else if (data.CurrentRevision != null)
+                    state = data.CurrentRevision.State;
+            }
+            return state == JFSData.JFSDataFileState.Completed;
+            */
         }
         public static bool IsCorruptFile(JFSData.JFSFileData data)
         {
@@ -1646,25 +1909,29 @@ namespace JaFS
             FileInfo fileInfo = new FileInfo(filePath);
             return VerifyRemote(fileInfo, md5Hash);
         }
-        public JFSBasicFile Update(string filePath)
+        public JFSBasicFile UpdateRemote(string filePath)
         {
             // Put, possibly replace, file contents with (new) data - but check first if it matches the existing file!
             FileInfo fileInfo = new FileInfo(filePath);
-            var newFileData = FileSystem.UploadIfNotAlreadyExists(FullName, fileInfo);  // Returns the new JFSFileData, which is complete!
+            bool wasChanged;
+            var newFileData = FileSystem.UploadIfChanged(FullName, fileInfo, out wasChanged);  // Returns the new JFSFileData, which is complete!
             // NB: We cannot just update the current data, since the new upload might be of a different state (e.g. uploaded an incomplete file and get a complete file back)!
             //     SetData(newFileData); // Replace existing data object with the new one!
             return Manufacture(FileSystem, newFileData, true); // Return entirely new object!
             // NB: Any parent objects (folder) that the client keeps needs to be refreshed for the updated file to be considered (folders keep revision data about files)!
         }
-        public JFSBasicFile Write(string filePath)
+        public JFSBasicFile Upload(FileInfo fileInfo)
         {
             // Put, possibly replace, file contents with (new) data.
-            FileInfo fileInfo = new FileInfo(filePath);
             var newFileData = FileSystem.UploadSimple(FullName, fileInfo);  // Returns the new JFSFileData, which is complete!
             // NB: We cannot just update the current data, since the new upload might be of a different state (e.g. uploaded an incomplete file and get a complete file back)!
             //     SetData(newFileData); // Replace existing data object with the new one!
             return Manufacture(FileSystem, newFileData, true); // Return entirely new object!
             // NB: Any parent objects (folder) that the client keeps needs to be refreshed for the updated file to be considered (folders keep revision data about files)!
+        }
+        public JFSBasicFile Upload(string filePath)
+        {
+            return Upload(new FileInfo(filePath));
         }
     }
 
@@ -1713,7 +1980,7 @@ namespace JaFS
         public virtual string Size { get { return Data.LatestRevision.Size.ToString(); } }
         public JFSIncompleteFile(Jottacloud fileSystem, JFSData.JFSFileData dataWithPath, bool isCompleteData) : base(fileSystem, dataWithPath, isCompleteData) { }
         public JFSIncompleteFile(Jottacloud fileSystem, string parentFullName, JFSData.JFSFileData incompleteDataWithoutPath) : base(fileSystem, parentFullName, incompleteDataWithoutPath) { }
-        public JFSBasicFile Resume(string filePath)
+        public JFSBasicFile ResumeUpload(string filePath)
         {
             if (!CompleteData)
             {
@@ -1762,7 +2029,7 @@ namespace JaFS
         {
             // Reading the file content by requesting the file url with parameter "mode=bin"
             var parameters = new Dictionary<string, string> { { "mode", "bin" } };
-            return FileSystem.Get(FullName, parameters);
+            return FileSystem.RequestGet(FullName, parameters);
         }
         public string ReadPartial(ulong from, ulong to)
         {
@@ -1771,18 +2038,52 @@ namespace JaFS
             // Note that HTTP range requests are inclusive end while we use open ended range range.
             var parameters = new Dictionary<string, string> { { "mode", "bin" } };
             var additionalHeaders = new Dictionary<string, string> { { "Range", string.Format("bytes=%d-%d",from,to-1) } };
-            return FileSystem.Get(FullName, parameters, additionalHeaders);
+            return FileSystem.RequestGet(FullName, parameters, additionalHeaders);
         }
         public void Stream(ulong chunk_size=64*1024)
         {
             // TODO: Is this necessary, and easily possible, with the .NET WebResponse stream?
             throw new NotImplementedException(); // TODO!
         }
+        public void Download(string localPath, bool overwrite)
+        {
+            Download(new FileInfo(localPath), overwrite);
+        }
+        public void Download(FileInfo localFile, bool overwrite)
+        {
+            if (localFile.Exists)
+            {
+                throw new InvalidOperationException(string.Format("Local file {0} already exists", localFile.FullName));
+            }
+            FileSystem.DownloadFile(FullName, localFile);
+            // Set back the timestamps of the downloaded file according to information from server
+            if (this.Created.HasValue)
+                localFile.CreationTimeUtc = this.Created.Value;
+            if (this.Modified.HasValue)
+                localFile.LastWriteTimeUtc = this.Modified.Value;
+            // What about Updated timestamp from server? And LastAccess timestamp on local file?
+        }
+        public bool UpdateLocal(FileInfo localFile)
+        {
+            if (!localFile.Exists)
+            {
+                throw new InvalidOperationException(string.Format("Local file {0} does not exists", localFile.FullName));
+            }
+            if (VerifyLocal(localFile) == false)
+            {
+                Download(localFile, true);
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
         public void Share(bool enable = true)
         {
             // Enable public access at secret, share only uri, and return that uri.
             var parameters = new Dictionary<string, string> { { "mode", enable ? "enableShare" : "disableShare" } };
-            var newFileData = FileSystem.FetchObject<JFSData.JFSFileData>(FullName, parameters); // Returns the new JFSFileData, which is complete (and now with or without publicURI on it)!
+            var newFileData = FileSystem.RequestGetObject<JFSData.JFSFileData>(FullName, parameters); // Returns the new JFSFileData, which is complete (and now with or without publicURI on it)!
             SetData(newFileData); // Replace existing data object with the new one!
         }
         public void UnShare()
@@ -1800,7 +2101,7 @@ namespace JaFS
             // Delete this file and return the new, deleted JFSFile.
             // See also JFSFolder.Delete()
             var parameters = new Dictionary<string, string> { { "dl", "true" } };
-            var newFileData = FileSystem.Post<JFSData.JFSFileData>(FullName, parameters); // Returns the new JFSFileData, which is complete (and now with a deleted timestamp on it)!
+            var newFileData = FileSystem.RequestPost<JFSData.JFSFileData>(FullName, parameters); // Returns the new JFSFileData, which is complete (and now with a deleted timestamp on it)!
             SetData(newFileData); // Replace existing data object with the new one!
             // NB: Any parent objects (folder) that the client keeps needs to be refreshed for the delete to be considered!
         }
@@ -1821,7 +2122,7 @@ namespace JaFS
             // See also JFSFolder.MoveRename()
             var moveToPath = FileSystem.ConvertToDataPath(newPath); // Convert to data path, appending the file system root name (username).
             var parameters = new Dictionary<string, string> { { "mv", moveToPath } };
-            var newFileData = FileSystem.Post<JFSData.JFSFileData>(FullName, parameters); // Returns the new JFSFileData, which is complete (and with the new name/path)!
+            var newFileData = FileSystem.RequestPost<JFSData.JFSFileData>(FullName, parameters); // Returns the new JFSFileData, which is complete (and with the new name/path)!
             SetData(newFileData); // Replace existing data object with the new one!
             // NB: Any parent objects (folder) that the client keeps needs to be refreshed for the moved file to be considered!
         }
@@ -1848,7 +2149,7 @@ namespace JaFS
                 default: throw new JFSError(string.Format("Invalid thumbnail size %d for image %s", size, FullName));
             }
             var parameters = new Dictionary<string, string> { { "mode", "thumb" }, { "ts", sizeCode } };
-            return FileSystem.Get(FullName, parameters, null);
+            return FileSystem.RequestGet(FullName, parameters, null);
         }
     }
 

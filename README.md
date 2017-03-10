@@ -153,7 +153,9 @@ counting the total storage used by the mount point, this information is not on r
 #### Folders
 
 Folders contain lists of folders (sub-folders) and files. Not very surprising. You can create
-new folders, rename/move them, delete them into trash or delete them permanently.
+new folders, rename/move them, delete them into trash or delete them permanently. There is also
+a method for uploading a local folder, which will loop trough it and create folders and upload
+files to the server location. There is also a corresponding method for downloading a remote folder.
 
 #### Files
 
@@ -172,7 +174,12 @@ adding more and more features. For example only JFSFile has a `Read` method (you
 content of complete files, and only JFSIncompleteFile has a `resume` method (to continue upload where
 a previous incomplete upload ended). But all files have `Write` method so that you can upload
 new content for it. Note that when you retrieve file objects from containers (such as folders or mount
-points) you will get them as JFSBasicFile, and you will need to cast it 
+points) you will get them as JFSBasicFile, and you will need to cast it according to the type.
+The JFSBasicFile class has properties for checking which type it really is.
+
+Timestamps for when the file was first created and the time of the last update (write) are preserved,
+but not timestamp for last read (access). Timestamps of folders are not preserved, as Jottacloud
+does not store them (only for mount points).
 
 Jottacloud includes functionality for sharing files, by generating a unique "secret" for it that can
 be used in a special URL for anyone knowing the secret to have access to the file.
@@ -181,11 +188,14 @@ Limitations
 ===========
 
 Some of the functions that are not implemented/completed yet:
-* Restore deleted items from trash.
-* Rename mount points.
-* Rename of devices.
+* Restore deleted items from trash (haven't found any API query that works).
+* Rename mount points (any one know the API method to do this?).
+* Rename of devices (any one know the API method to do this?).
 * Robust handling of any kind of issues that can occur during file upload.
 * Proper handling of file versions.
+* Sync-operation, e.g. delete files from remote folder which are no longer present in matching local folder.
+Not sure if this will ever be part of this library though, probably better to build something on top of it
+for these kind of features.
 
 Side notes
 ==========
