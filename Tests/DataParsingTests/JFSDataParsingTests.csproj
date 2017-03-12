@@ -7,8 +7,8 @@
     <ProjectGuid>{0D593132-5307-4A44-BD27-6507302C08C4}</ProjectGuid>
     <OutputType>Exe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>JottacloudFileSystemSerializationTester</RootNamespace>
-    <AssemblyName>JottacloudFileSystemSerializationTester</AssemblyName>
+    <RootNamespace>JFSDataParsingTests</RootNamespace>
+    <AssemblyName>JFSDataParsingTests</AssemblyName>
     <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
@@ -40,31 +40,31 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\JottacloudFileSystem\JFSData\JFSDevice.cs">
+    <Compile Include="..\..\JottacloudFileSystem\JFSData\JFSDevice.cs">
       <Link>JFSData\JFSDevice.cs</Link>
     </Compile>
-    <Compile Include="..\JottacloudFileSystem\JFSData\JFSEnableSharing.cs">
+    <Compile Include="..\..\JottacloudFileSystem\JFSData\JFSEnableSharing.cs">
       <Link>JFSData\JFSEnableSharing.cs</Link>
     </Compile>
-    <Compile Include="..\JottacloudFileSystem\JFSData\JFSFile.cs">
+    <Compile Include="..\..\JottacloudFileSystem\JFSData\JFSFile.cs">
       <Link>JFSData\JFSFile.cs</Link>
     </Compile>
-    <Compile Include="..\JottacloudFileSystem\JFSData\JFSFileDirList.cs">
+    <Compile Include="..\..\JottacloudFileSystem\JFSData\JFSFileDirList.cs">
       <Link>JFSData\JFSFileDirList.cs</Link>
     </Compile>
-    <Compile Include="..\JottacloudFileSystem\JFSData\JFSFolder.cs">
+    <Compile Include="..\..\JottacloudFileSystem\JFSData\JFSFolder.cs">
       <Link>JFSData\JFSFolder.cs</Link>
     </Compile>
-    <Compile Include="..\JottacloudFileSystem\JFSData\JFSMountPoint.cs">
+    <Compile Include="..\..\JottacloudFileSystem\JFSData\JFSMountPoint.cs">
       <Link>JFSData\JFSMountPoint.cs</Link>
     </Compile>
-    <Compile Include="..\JottacloudFileSystem\JFSData\JFSObject.cs">
+    <Compile Include="..\..\JottacloudFileSystem\JFSData\JFSObject.cs">
       <Link>JFSData\JFSObject.cs</Link>
     </Compile>
-    <Compile Include="..\JottacloudFileSystem\JFSData\JFSSearchResult.cs">
+    <Compile Include="..\..\JottacloudFileSystem\JFSData\JFSSearchResult.cs">
       <Link>JFSData\JFSSearchResult.cs</Link>
     </Compile>
-    <Compile Include="..\JottacloudFileSystem\JFSData\JFSUser.cs">
+    <Compile Include="..\..\JottacloudFileSystem\JFSData\JFSUser.cs">
       <Link>JFSData\JFSUser.cs</Link>
     </Compile>
     <Compile Include="Program.cs" />

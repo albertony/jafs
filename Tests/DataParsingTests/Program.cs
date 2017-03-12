@@ -2,7 +2,7 @@
 using System.IO;
 using System.Xml.Serialization;
 
-namespace JottaLibSerializationTester
+namespace JFSDataParsingTests
 {
     class Program
     {

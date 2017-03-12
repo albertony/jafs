@@ -80,7 +80,7 @@ namespace JaFS
         }
         private void FetchDataObject()
         {
-            Data = RequestGetObject<JFSData.JFSUserData>(""); // Fetch the user object, which is our root level data object.
+            Data = RequestGetDataObject<JFSData.JFSUserData>(""); // Fetch the user object, which is our root level data object.
         }
         public string[] GetDeviceNames()
         {
@@ -245,7 +245,7 @@ namespace JaFS
         public JFSTrash GetTrash()
         {
             var path = "/" + BUILTIN_DEVICE_NAME + "/Trash";
-            var trashData = RequestGetObject<JFSData.JFSMountPointData>(path);
+            var trashData = RequestGetDataObject<JFSData.JFSMountPointData>(path);
             return new JFSTrash(this, trashData);
         }
         public JFSBasicFile[] GetSharedFiles()
@@ -253,7 +253,7 @@ namespace JaFS
             // Return list of shared files.
             // TODO: The list currently includes any deleted shared files also..
             var path = "/" + BUILTIN_DEVICE_NAME + "/Links";
-            var searchResultData = RequestGetObject<JFSData.JFSSearchResultData>(path);
+            var searchResultData = RequestGetDataObject<JFSData.JFSSearchResultData>(path);
             JFSBasicFile[] files = new JFSFile[searchResultData.Files.Length];
             for (int i = 0; i < searchResultData.Files.Length; i++)
             {
@@ -277,7 +277,7 @@ namespace JaFS
                 { "sort", sortBy },
                 { "web", "true" }
             };
-            var searchResultData = RequestGetObject<JFSData.JFSSearchResultData>(path, parameters);
+            var searchResultData = RequestGetDataObject<JFSData.JFSSearchResultData>(path, parameters);
             // NB: When limiting results with the "max" parameter then Metadata.NumberOfFiles show the same value as without this limit, so fewer files can be returned!
             JFSBasicFile[] files = new JFSFile[searchResultData.Files.Length];
             for (int i = 0; i < searchResultData.Files.Length; i++)
@@ -378,7 +378,7 @@ namespace JaFS
                 }
             }
         }
-        public DataObjectType RequestGetObject<DataObjectType>(string path, ICollection<KeyValuePair<string, string>> queryParameters = null, ICollection<KeyValuePair<string, string>> additionalHeaders = null)
+        public DataObjectType RequestGetDataObject<DataObjectType>(string path, ICollection<KeyValuePair<string, string>> queryParameters = null, ICollection<KeyValuePair<string, string>> additionalHeaders = null)
         {
             // Make a GET request for url
             Uri uri = CreateUri(path, queryParameters);
@@ -936,7 +936,7 @@ namespace JaFS
         private void FetchCompleteData(string fullName)
         {
             // Variant for the case where we have no basic data object to fetch the name from, and it required as the last path of the uri.
-            SetData(FileSystem.RequestGetObject<DataObjectType>(fullName), true); // NB: Always complete data!
+            SetData(FileSystem.RequestGetDataObject<DataObjectType>(fullName), true); // NB: Always complete data!
         }
     }
 
@@ -1302,7 +1302,7 @@ namespace JaFS
             // The incomplete file data contains MD5 hash, but corrupt files does not have this set. Also incomplete files
             // does not have the size property set when fetched from FileDirList, must fetch complete data to get this.
             var queryParameters = new Dictionary<string, string> { { "mode", "list" } };
-            var fileDirDataObject = FileSystem.RequestGetObject<JFSData.JFSFileDirListData>(FullName, queryParameters);
+            var fileDirDataObject = FileSystem.RequestGetDataObject<JFSData.JFSFileDirListData>(FullName, queryParameters);
             // Build a simple file tree using basic information from the FileDirList.
             // Representing it as a map containing all files (no folders), where the path is the key and
             // a basic structure with {name, size, md5, uuid, state} is the value.
@@ -2083,7 +2083,7 @@ namespace JaFS
         {
             // Enable public access at secret, share only uri, and return that uri.
             var parameters = new Dictionary<string, string> { { "mode", enable ? "enableShare" : "disableShare" } };
-            var newFileData = FileSystem.RequestGetObject<JFSData.JFSFileData>(FullName, parameters); // Returns the new JFSFileData, which is complete (and now with or without publicURI on it)!
+            var newFileData = FileSystem.RequestGetDataObject<JFSData.JFSFileData>(FullName, parameters); // Returns the new JFSFileData, which is complete (and now with or without publicURI on it)!
             SetData(newFileData); // Replace existing data object with the new one!
         }
         public void UnShare()

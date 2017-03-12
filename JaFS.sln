@@ -5,7 +5,7 @@ VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JottacloudFileSystem", "JottacloudFileSystem\JottacloudFileSystem.csproj", "{EDCD0380-5C21-4160-87FE-A3A33E8ED699}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JFSSerializationTester", "SerializationTester\JFSSerializationTester.csproj", "{0D593132-5307-4A44-BD27-6507302C08C4}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JFSDataParsingTests", "Tests\DataParsingTests\JFSDataParsingTests.csproj", "{0D593132-5307-4A44-BD27-6507302C08C4}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
