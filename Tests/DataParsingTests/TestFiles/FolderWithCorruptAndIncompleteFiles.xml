@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<folder name="NewSubfolder" time="2017-03-12-T20:09:51Z" host="dn-099">
+  <path xml:space="preserve">/get-45406748/Jotta/Archive/Test</path>
+  <abspath xml:space="preserve">/get-45406748/Jotta/Archive/Test</abspath>
+  <files>
+    <file name="jottafuse.py" uuid="ca9a8ddf-90ee-44fd-9396-c5cefb2c0531" deleted="2017-03-04-T09:44:04Z">
+      <abspath xml:space="preserve">/get-45406748/Jotta/Archive/Test/NewSubfolder</abspath>
+      <currentRevision>
+        <number>3</number>
+        <state>COMPLETED</state>
+        <created>2017-03-04-T09:34:51Z</created>
+        <modified>2017-03-04-T09:34:51Z</modified>
+        <mime>application/octet-stream</mime>
+        <mstyle>application/octet-stream</mstyle>
+        <size>13217</size>
+        <md5>59C4BD52EC0E2F4BB8AC230266B2D358</md5>
+        <updated>2017-03-04-T09:34:51Z</updated>
+      </currentRevision>
+    </file>
+    <file name="jottafuse.py2" uuid="88a0687d-22ed-4060-8aad-fad520d63b30" deleted="2017-03-04-T09:44:04Z">
+      <abspath xml:space="preserve">/get-45406748/Jotta/Archive/Test/NewSubfolder</abspath>
+      <currentRevision>
+        <number>3</number>
+        <state>COMPLETED</state>
+        <created>2017-03-04-T09:34:57Z</created>
+        <modified>2017-03-04-T09:34:57Z</modified>
+        <mime>application/octet-stream</mime>
+        <mstyle>application/octet-stream</mstyle>
+        <size>13217</size>
+        <md5>59C4BD52EC0E2F4BB8AC230266B2D358</md5>
+        <updated>2017-03-04-T09:34:57Z</updated>
+      </currentRevision>
+    </file>
+    <file name="temp.txt2" uuid="28324804-b699-470e-bec8-4ea9d5651f66" deleted="2017-03-04-T09:32:34Z">
+      <abspath xml:space="preserve">/get-45406748/Jotta/Archive/Test/NewSubfolder</abspath>
+      <currentRevision>
+        <number>2</number>
+        <state>COMPLETED</state>
+        <created>2017-03-04-T09:30:35Z</created>
+        <modified>2017-03-04-T09:30:35Z</modified>
+        <mime>application/octet-stream</mime>
+        <mstyle>application/octet-stream</mstyle>
+        <size>0</size>
+        <md5>D41D8CD98F00B204E9800998ECF8427E</md5>
+        <updated>2017-03-04-T09:30:35Z</updated>
+      </currentRevision>
+    </file>
+    <file name="_corrupt_file_" uuid="d70e3518-e58b-40a9-ab94-cd4110a95731">
+      <latestRevision>
+        <number>1</number>
+        <state>CORRUPT</state>
+        <created>2017-03-10-T12:02:23Z</created>
+        <modified>2017-03-10-T12:02:23Z</modified>
+        <mime>application/octet-stream</mime>
+        <mstyle>application/octet-stream</mstyle>
+        <md5>59C4BD52EC0E2F4BB8AC230266B2D358</md5>
+        <updated>2017-03-10-T12:02:23Z</updated>
+      </latestRevision>
+    </file>
+    <file name="_incomplete_file_" uuid="c724c00e-d354-4027-b5ff-c83aef810be2">
+      <latestRevision>
+        <number>1</number>
+        <state>INCOMPLETE</state>
+        <created>2017-03-10-T12:01:56Z</created>
+        <modified>2017-03-10-T12:01:56Z</modified>
+        <mime>application/octet-stream</mime>
+        <mstyle>application/octet-stream</mstyle>
+        <md5>59C4BD52EC0E2F4BB8AC230266B2D358</md5>
+        <updated>2017-03-10-T12:01:56Z</updated>
+      </latestRevision>
+    </file>
+    <file name="_previously_corrupt_file_" uuid="aece9b73-7cef-41e5-80ef-5ab5f3b11e92">
+      <currentRevision>
+        <number>2</number>
+        <state>COMPLETED</state>
+        <created>2017-03-10-T12:09:23Z</created>
+        <modified>2017-03-10-T12:09:23Z</modified>
+        <mime>application/octet-stream</mime>
+        <mstyle>application/octet-stream</mstyle>
+        <size>7</size>
+        <md5>68EACB97D86F0C4621FA2B0E17CABD8C</md5>
+        <updated>2017-03-10-T12:09:23Z</updated>
+      </currentRevision>
+      <latestRevision>
+        <number>3</number>
+        <state>CORRUPT</state>
+        <created>2017-03-10-T12:10:28Z</created>
+        <modified>2017-03-10-T12:10:28Z</modified>
+        <mime>application/octet-stream</mime>
+        <mstyle>application/octet-stream</mstyle>
+        <md5>68EACB97D86F0C462fff2B0E17CABD8C</md5>
+        <updated>2017-03-10-T12:10:28Z</updated>
+      </latestRevision>
+    </file>
+  </files>
+  <metadata first="" max="" total="6" num_folders="0" num_files="6"/>
+</folder>

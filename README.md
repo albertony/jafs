@@ -187,15 +187,23 @@ be used in a special URL for anyone knowing the secret to have access to the fil
 Limitations
 ===========
 
-Some of the functions that are not implemented/completed yet:
-* Restore deleted items from trash (haven't found any API query that works).
-* Rename mount points (any one know the API method to do this?).
-* Rename of devices (any one know the API method to do this?).
+In general the main forcus so far has been on handling the data structure, with devices, mount points
+and folders. File handling with uploading/downloading of files is also implemented, but there are
+some issues.
+
+Some of the things that have issues/are not completed/not started on yet:
+* The uploading of folder with the "SkipIdenticalFiles" option, which is intended so save
+traffic by checking MD5 of already uploaded files, seems to have issues (the cphash argument
+in the API request).
 * Robust handling of any kind of issues that can occur during file upload.
 * Proper handling of file versions.
+* Restore deleted items from trash (haven't found any API query that works).
+* Rename mount points (haven't found any API query that works).
+* Rename of devices (haven't found any API query that works).
 * Sync-operation, e.g. delete files from remote folder which are no longer present in matching local folder.
 Not sure if this will ever be part of this library though, probably better to build something on top of it
-for these kind of features.
+for these kind of features. Maybe implementing Jottacloud support in [rclone](https://github.com/ncw/rclone)
+is a better option?
 
 Side notes
 ==========
@@ -211,7 +219,10 @@ continuous file synchronization program for synchronizing files directly between
 Contributing
 ============
 
-Written entirely by me as of now, although under heavy influence by the projects mentioned in credits.
+Help needed first of all with testing, and reporing any [issues](https://github.com/albertony/jafs/issues) found.
+
+Then if you can figure out some of the missing pieces in the Jottacloud API (see the limitations section) it is
+also highly appreciated.
 
 History
 =======

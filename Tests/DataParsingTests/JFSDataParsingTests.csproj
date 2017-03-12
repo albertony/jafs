@@ -92,6 +92,7 @@
     <Content Include="TestFiles\FileWithHistory.xml" />
     <Content Include="TestFiles\Folder.xml" />
     <Content Include="TestFiles\FolderDeleted.xml" />
+    <Content Include="TestFiles\FolderWithCorruptAndIncompleteFiles.xml" />
     <Content Include="TestFiles\Links.xml" />
     <Content Include="TestFiles\MountPoint.xml">
       <SubType>Designer</SubType>

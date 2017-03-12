@@ -492,12 +492,12 @@ namespace JaFS
         }
         public JFSData.JFSFileData VerifyFile(string remotePath, FileInfo fileInfo, string md5Hash)
         {
-            // Check if there is a file at specified location with same name and MD5 hash as the specified local file!
+            // Check if there is a valid file (not considering incomplete or corrupt revisions etc) at specified location with same name and MD5 hash as the specified local file!
             return VerifyFile(remotePath, fileInfo.Length.ToString(), fileInfo.CreationTimeUtc.ToString(JFS_DATE_FORMAT), fileInfo.LastWriteTimeUtc.ToString(JFS_DATE_FORMAT), md5Hash);
         }
         private JFSData.JFSFileData VerifyFile(string remotePath, string size, string timeCreated, string timeModified, string md5Hash)
         {
-            // Check if there is a file at specified location with same name, and MD5 hash as the specified local file!
+            // Check if there is a valid file (not considering incomplete or corrupt revisions etc) at specified location with same name, and MD5 hash as the specified local file!
             var queryParameters = new Dictionary<string, string> { { "cphash", "true" } };
             var additionalHeaders = new Dictionary<string, string> {
                 { "JMd5", md5Hash },
@@ -577,8 +577,11 @@ namespace JaFS
 
                 // Check if identical file already exists
                 var fileData = VerifyFile(remotePath, sizeString, timeCreated, timeModified, md5Hash);
-                // Verify that the file is complete and not corrupt
-                if (JFSBasicFile.IsCompletedFile(fileData))
+                if (fileData != null)
+                // TODO: Do we also need to verify that the returned file is complete and not corrupt? This does not seem to be necessary,
+                //       since the VerifyFile (cphash request) seem to fail even if trying to match the correct md5 of an incomplete revision,
+                //       but not certain about this...
+                //if (JFSBasicFile.NewestVersionIsCompleted(fileData)) // TODO: Is it necessary to do this, or is it enough to check if VerifyFile returned null due to HTTP 404 or some data when HTTP 200?
                 {
                     wasChanged = false;
                     return fileData; // File already exists!
@@ -1453,8 +1456,8 @@ namespace JaFS
                     numberOfFilesUploaded++;
                     logMessageCallback?.Invoke(string.Format("Uploaded file {0} [{1}] in {2}", jfsPath, JFSData.JFSDataUtilities.HumanizeDataSize((ulong)fileInfo.Length), stopwatch.Elapsed));
                 }
-                if (!JFSBasicFile.IsCompletedFile(result))
-                    throw new InvalidOperationException("Upload to " + jfsPath + " filed!");
+                if (!JFSBasicFile.NewestVersionIsCompleted(result))
+                    throw new InvalidOperationException("Upload to " + jfsPath + " failed!");
                 numberOfFilesProcessed++;
             }
         }
@@ -1511,9 +1514,11 @@ namespace JaFS
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             foreach (var jfsBasicFile in GetFiles())
             {
-                if (jfsBasicFile.IsCompleted)
+                // Ensure file has a valid version, and not only incomplete/corrupt versions.
+                if (jfsBasicFile.IsValid) // if (jfsBasicFile is JFSFile)
                 {
-                    var jfsFile = jfsBasicFile as JFSFile;
+                    // Download the current valid version of the file.
+                    var jfsFile = (JFSFile)jfsBasicFile;
                     jfsFile.FetchCompleteData();
                     FileInfo localFileInfo = new FileInfo(localFolderInfo.FullName + "\\" + jfsFile.Name);
                     if (localFileInfo.Exists && skipIdenticalFiles)
@@ -1766,46 +1771,26 @@ namespace JaFS
         public string OriginalParentPath { get { return Data.OriginalPath != null ? FileSystem.ConvertFromDataPath(Data.OriginalPath) + "/" : null; } } // If deleted this contains the full path to the original parent, since ParentPath is the path within Trash. For deleted files this is present also in incomplete data objects
         public string OriginalFullName { get { return OriginalParentPath == null ? null : OriginalParentPath + Name; } } // If deleted this contains the original Full path of this object. Never ending with path separator.
         public Guid ID { get { return Data.UUID; } }
-        public bool IsNormal { get { return IsNormalFile(Data); } }
-        public bool IsCompleted { get { return IsCompletedFile(Data); } }
-        public bool IsIncomplete { get { return IsIncompleteFile(Data); } }
-        public bool IsCorrupt { get { return IsCorruptFile(Data); } }
+        public virtual bool IsValid { get { return Data.CurrentRevision != null; } } // If it is a JFSBasicFile then it has the potential to become a valid JFSFile if is has a valid version. But it might also have a have newer incomplete or corrupt version.
         protected override string CreateChildPath(string childName) { throw new InvalidOperationException(); } // Not supported for files!
         public JFSBasicFile(Jottacloud fileSystem, JFSData.JFSFileData dataWithPath, bool isCompleteData) : base(fileSystem, dataWithPath, isCompleteData) { }
         public JFSBasicFile(Jottacloud fileSystem, string parentFullName, JFSData.JFSFileData incompleteDataWithoutPath) : base(fileSystem, parentFullName, incompleteDataWithoutPath) { }
-        public static bool IsNormalFile(JFSData.JFSFileData data)
+        public static bool NewestVersionIsCompleted(JFSData.JFSFileData data)
         {
-            return data.CurrentRevision != null;
+            // Used for checking upload success.
+            // If there is a LatestRevision it is a newer and not completed version than some previous complete version (if any at all).
+            // I think that if there is a CurrentRevision then it is always complete, but we can test the state just to be on the safe side.
+            // When uploading files we must verify that we get data for a valid, completed file back. Because for instance if there is
+            // a hash mismatch the upload request succeeds but we get file data with a corrupt latest version back.
+            return data.LatestRevision == null && data.CurrentRevision != null && data.CurrentRevision.State == JFSData.JFSDataFileState.Completed;
         }
-        public static bool IsCompletedFile(JFSData.JFSFileData data)
-        {
-            return IsNormalFile(data) && data.CurrentRevision != null && data.CurrentRevision.State == JFSData.JFSDataFileState.Completed;
-            /*
-            JFSData.JFSDataFileState state = JFSData.JFSDataFileState.Processing;
-            if (data != null)
-            {
-                if (data.LatestRevision != null)
-                    state = data.LatestRevision.State;
-                else if (data.CurrentRevision != null)
-                    state = data.CurrentRevision.State;
-            }
-            return state == JFSData.JFSDataFileState.Completed;
-            */
-        }
-        public static bool IsCorruptFile(JFSData.JFSFileData data)
-        {
-            return !IsNormalFile(data) && data.LatestRevision != null && data.LatestRevision.State == JFSData.JFSDataFileState.Corrupt;
-        }
-        public static bool IsIncompleteFile(JFSData.JFSFileData data)
-        {
-            return !IsNormalFile(data) && data.LatestRevision != null && data.LatestRevision.State == JFSData.JFSDataFileState.Incomplete;
-        }
+
         public static JFSBasicFile Manufacture(Jottacloud fileSystem, string parentFullName, JFSData.JFSFileData data)
         {
             // Class method to get the correct file class instantiated
             if (data.CurrentRevision != null)
             {
-                // A normal file
+                // A valid file
                 return ManufactureFromCurrentVersion(fileSystem, parentFullName, data);
             }
             else
@@ -1819,7 +1804,7 @@ namespace JaFS
             // Class method to get the correct file class instantiated
             if (dataWithPath.CurrentRevision != null)
             {
-                // A normal file
+                // A valid file
                 return ManufactureFromCurrentVersion(fileSystem, dataWithPath, isCompleteData);
             }
             else
@@ -1956,9 +1941,10 @@ namespace JaFS
         public virtual string MD5 { get { return Data.LatestRevision.MD5; } }
         public virtual System.Net.Mime.ContentType Mime { get { return Data.LatestRevision.Mime.Mime; } }
         public virtual JFSData.JFSDataFileState State { get { return Data.LatestRevision.State; } }
-        public long NumberOfVersions { get { return (HasPreviousCompletedVersion ? 2 : 1) + (Data.OldRevisions != null ? Data.OldRevisions.Length : 0); } } // This, the LatestRevision counts 1. If there is a previous completed version it counts +1. And if there are more old revisions they count as well.
-        public bool HasPreviousCompletedVersion { get { return Data.CurrentRevision != null; } }
-        public JFSFile GetCompletedVersion() { return HasPreviousCompletedVersion ? ManufactureFromCurrentVersion(FileSystem, Data, CompleteData) : null; }
+        public override bool IsValid { get { return false; } } // If it is a JFSCorruptFile or JFSIncompleteFile then it is by definition an invalid file.
+        public long NumberOfVersions { get { return (HasOlderValidVersion ? 2 : 1) + (Data.OldRevisions != null ? Data.OldRevisions.Length : 0); } } // This, the LatestRevision counts 1. If there is a previous completed version it counts +1. And if there are more old revisions they count as well.
+        public bool HasOlderValidVersion { get { return Data.CurrentRevision != null; } }
+        public JFSFile GetValidVersion() { return HasOlderValidVersion ? ManufactureFromCurrentVersion(FileSystem, Data, CompleteData) : null; }
         public JFSFile GetOldVersion(int steps = 1) { throw new NotImplementedException(); }
         public JFSCorruptFile(Jottacloud fileSystem, JFSData.JFSFileData dataWithPath, bool isCompleteData) : base(fileSystem, dataWithPath, isCompleteData) { }
         public JFSCorruptFile(Jottacloud fileSystem, string parentFullName, JFSData.JFSFileData incompleteDataWithoutPath) : base(fileSystem, parentFullName, incompleteDataWithoutPath) {}
@@ -2021,8 +2007,9 @@ namespace JaFS
         public override string MD5 { get { return Data.CurrentRevision.MD5; } }
         public override System.Net.Mime.ContentType Mime { get { return Data.CurrentRevision.Mime.Mime; } }
         public override JFSData.JFSDataFileState State { get { return Data.CurrentRevision.State; } }
-        public bool HasNewerCorruptVersion { get { return Data.LatestRevision != null; } } // Meaning incomplete or corrupt!
-        public JFSCorruptFile GetLatestVersion() { return HasNewerCorruptVersion ? ManufactureFromLatestVersion(FileSystem, Data, CompleteData) : null; }
+        public override bool IsValid { get { return true; } } // If it is a JFSFile then it is by definition a valid file.
+        public bool HasNewerInvalidVersion { get { return Data.LatestRevision != null; } } // Meaning incomplete or corrupt!
+        public JFSCorruptFile GetLatestVersion() { return HasNewerInvalidVersion ? ManufactureFromLatestVersion(FileSystem, Data, CompleteData) : null; }
         public JFSFile(Jottacloud fileSystem, JFSData.JFSFileData dataWithPath, bool isCompleteData) : base(fileSystem, dataWithPath, isCompleteData) { }
         public JFSFile(Jottacloud fileSystem, string parentFullName, JFSData.JFSFileData incompleteDataWithoutPath) : base(fileSystem, parentFullName, incompleteDataWithoutPath) { }
         public string Read()
