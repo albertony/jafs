@@ -1,20 +1,23 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{0D593132-5307-4A44-BD27-6507302C08C4}</ProjectGuid>
-    <OutputType>Exe</OutputType>
+    <ProjectGuid>{856D8096-D642-4A98-BC9E-B32824FD1428}</ProjectGuid>
+    <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>JFSDataParsingTests</RootNamespace>
-    <AssemblyName>JFSDataParsingTests</AssemblyName>
+    <RootNamespace>DataParsingTests</RootNamespace>
+    <AssemblyName>DataParsingTests</AssemblyName>
     <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <ProjectTypeGuids>{3AC096D0-A1C2-E12C-1390-A8335801FDAB};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
+    <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
+    <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)</VSToolsPath>
+    <ReferencePath>$(ProgramFiles)\Common Files\microsoft shared\VSTT\$(VisualStudioVersion)\UITestExtensionPackages</ReferencePath>
+    <IsCodedUITest>False</IsCodedUITest>
+    <TestProjectType>UnitTest</TestProjectType>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <PlatformTarget>AnyCPU</PlatformTarget>
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
@@ -24,7 +27,6 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <PlatformTarget>AnyCPU</PlatformTarget>
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
@@ -34,44 +36,23 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
   </ItemGroup>
+  <Choose>
+    <When Condition="('$(VisualStudioVersion)' == '10.0' or '$(VisualStudioVersion)' == '') and '$(TargetFrameworkVersion)' == 'v3.5'">
+      <ItemGroup>
+        <Reference Include="Microsoft.VisualStudio.QualityTools.UnitTestFramework, Version=10.1.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL" />
+      </ItemGroup>
+    </When>
+    <Otherwise>
+      <ItemGroup>
+        <Reference Include="Microsoft.VisualStudio.QualityTools.UnitTestFramework" />
+      </ItemGroup>
+    </Otherwise>
+  </Choose>
   <ItemGroup>
-    <Compile Include="..\..\JottacloudFileSystem\JFSData\JFSDevice.cs">
-      <Link>JFSData\JFSDevice.cs</Link>
-    </Compile>
-    <Compile Include="..\..\JottacloudFileSystem\JFSData\JFSEnableSharing.cs">
-      <Link>JFSData\JFSEnableSharing.cs</Link>
-    </Compile>
-    <Compile Include="..\..\JottacloudFileSystem\JFSData\JFSFile.cs">
-      <Link>JFSData\JFSFile.cs</Link>
-    </Compile>
-    <Compile Include="..\..\JottacloudFileSystem\JFSData\JFSFileDirList.cs">
-      <Link>JFSData\JFSFileDirList.cs</Link>
-    </Compile>
-    <Compile Include="..\..\JottacloudFileSystem\JFSData\JFSFolder.cs">
-      <Link>JFSData\JFSFolder.cs</Link>
-    </Compile>
-    <Compile Include="..\..\JottacloudFileSystem\JFSData\JFSMountPoint.cs">
-      <Link>JFSData\JFSMountPoint.cs</Link>
-    </Compile>
-    <Compile Include="..\..\JottacloudFileSystem\JFSData\JFSObject.cs">
-      <Link>JFSData\JFSObject.cs</Link>
-    </Compile>
-    <Compile Include="..\..\JottacloudFileSystem\JFSData\JFSSearchResult.cs">
-      <Link>JFSData\JFSSearchResult.cs</Link>
-    </Compile>
-    <Compile Include="..\..\JottacloudFileSystem\JFSData\JFSUser.cs">
-      <Link>JFSData\JFSUser.cs</Link>
-    </Compile>
-    <Compile Include="Program.cs" />
+    <Compile Include="DataParsingTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="TestFiles\Device.xml" />
@@ -95,15 +76,38 @@
     <Content Include="TestFiles\FolderDeleted.xml" />
     <Content Include="TestFiles\FolderWithCorruptAndIncompleteFiles.xml" />
     <Content Include="TestFiles\Links.xml" />
-    <Content Include="TestFiles\MountPoint.xml">
-      <SubType>Designer</SubType>
-    </Content>
+    <Content Include="TestFiles\MountPoint.xml" />
     <Content Include="TestFiles\MountPointCreatePostResponse.xml" />
     <Content Include="TestFiles\MountPointDeletePermanentPostResponse.xml" />
     <Content Include="TestFiles\SearchResult.xml" />
     <Content Include="TestFiles\Trash.xml" />
     <Content Include="TestFiles\User.xml" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\JottacloudFileSystem\JottacloudFileSystem.csproj">
+      <Project>{edcd0380-5c21-4160-87fe-a3a33e8ed699}</Project>
+      <Name>JottacloudFileSystem</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Choose>
+    <When Condition="'$(VisualStudioVersion)' == '10.0' And '$(IsCodedUITest)' == 'True'">
+      <ItemGroup>
+        <Reference Include="Microsoft.VisualStudio.QualityTools.CodedUITestFramework, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+          <Private>False</Private>
+        </Reference>
+        <Reference Include="Microsoft.VisualStudio.TestTools.UITest.Common, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+          <Private>False</Private>
+        </Reference>
+        <Reference Include="Microsoft.VisualStudio.TestTools.UITest.Extension, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+          <Private>False</Private>
+        </Reference>
+        <Reference Include="Microsoft.VisualStudio.TestTools.UITesting, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+          <Private>False</Private>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+  <Import Project="$(VSToolsPath)\TeamTest\Microsoft.TestTools.targets" Condition="Exists('$(VSToolsPath)\TeamTest\Microsoft.TestTools.targets')" />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

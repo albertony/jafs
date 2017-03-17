@@ -5,11 +5,11 @@ using System.Runtime.InteropServices;
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("JottaLibSerializationTester")]
-[assembly: AssemblyDescription("")]
+[assembly: AssemblyTitle("DataParsingTests")]
+[assembly: AssemblyDescription("JottacloudFileSystem (JaFS) tests")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("JottaLibSerializationTester")]
+[assembly: AssemblyProduct("JottacloudFileSystem")]
 [assembly: AssemblyCopyright("Copyright ©  2017")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]

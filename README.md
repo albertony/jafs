@@ -214,7 +214,7 @@ Side notes
 Check out [Duplicati](https://github.com/duplicati), *a free, open source, backup client that
 securely stores encrypted, incremental, compressed backups on cloud storage services and remote file servers.*
 I used my experience from the current project to contribute with a Jottacloud backend,
-so that you can store *encrypted, incremental and compressed* backup in your unlimited.
+so that you can store unlimited amount of *encrypted, incremental and compressed* backup.
 
 I also recommend [Syncthing](https://github.com/syncthing/syncthing), an open source, cross-platform, encrypted,
 continuous file synchronization program for synchronizing files directly between devices.

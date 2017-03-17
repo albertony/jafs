@@ -1,10 +1,13 @@
-﻿using JFSData;
+﻿using System;
 using System.IO;
 using System.Xml.Serialization;
+using JFSData;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 
-namespace JFSDataParsingTests
+namespace DataParsingTests
 {
-    class Program
+    [TestClass]
+    public class DataParsingTests
     {
         private static string TestFilesDirectory = @"..\..\TestFiles";
 
@@ -19,13 +22,13 @@ namespace JFSDataParsingTests
                 obj = (DataObjectType)serializer.Deserialize(reader); // Throws exception if XML cannot be parsed!
         }
 
-        static void Main(string[] args)
+        [TestMethod]
+        public void TestParseAllXmlFiles()
         {
-            if (args.Length > 0)
-                TestFilesDirectory = args[0];
+            // This test will fail if any of the parsing operations throws an exception!
+
             if (!Directory.Exists(TestFilesDirectory))
                 throw new System.ArgumentException(string.Format("Test file directory {0} does not exist", TestFilesDirectory));
-
             Parse<JFSUserData>("User.xml");
             Parse<JFSDeviceData>("Device.xml");
             Parse<JFSMountPointData>("MountPoint.xml");
