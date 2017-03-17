@@ -2214,34 +2214,4 @@ namespace JaFS
         }
 #endif
     }
-#if false
-    class JFSBadRequestError : JFSError  // HTTP 400
-    {
-        public JFSBadRequestError(String message) : base(message) { }
-    }
-    class JFSCredentialsError : JFSError // HTTP 401
-    {
-        public JFSCredentialsError(String message) : base(message) { }
-    }
-    class JFSNotFoundError : JFSError //HTTP 404
-    {
-        public JFSNotFoundError(String message) : base(message) { }
-    }
-    class JFSAccessError : JFSError // ?
-    {
-        public JFSAccessError(String message) : base(message) { }
-    }
-    class JFSAuthenticationError : JFSError // HTTP 403
-    {
-        public JFSAuthenticationError(String message) : base(message) { }
-    }
-    class JFSRangeError : JFSError // HTTP 416
-    {
-        public JFSRangeError(String message) : base(message) { }
-    }
-    class JFSServerError : JFSError //HTTP 500
-    {
-        public JFSServerError(String message) : base(message) { }
-    }
-#endif
 }

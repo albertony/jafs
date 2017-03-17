@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<file name="empty.proto" uuid="dfcdd700-4fb4-4a9f-affa-158295288d94" time="2017-03-17-T15:49:25Z" host="dn-098">
+  <path xml:space="preserve">/user01/Jotta/Archive/Testfolder2</path>
+  <abspath xml:space="preserve">/user01/Jotta/Archive/Testfolder2</abspath>
+  <currentRevision>
+    <number>1</number>
+    <state>COMPLETED</state>
+    <created>2017-03-10-T19:39:05Z</created>
+    <modified>2017-03-10-T19:39:05Z</modified>
+    <mime>application/octet-stream</mime>
+    <mstyle>application/octet-stream</mstyle>
+    <size>2422</size>
+    <md5>4cca2ae3b1554a75509e7b40d9aec05b</md5>
+    <updated>2017-03-10-T19:39:05Z</updated>
+  </currentRevision>
+</file>

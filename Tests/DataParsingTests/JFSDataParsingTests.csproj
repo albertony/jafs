@@ -75,12 +75,13 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="TestFiles\Device.xml" />
-    <Content Include="TestFiles\EnableSharing.xml" />
     <Content Include="TestFiles\File.xml" />
     <Content Include="TestFiles\FileCorrupt.xml" />
     <Content Include="TestFiles\FileDeleted.xml" />
     <Content Include="TestFiles\FileDeletePostResponse.xml" />
     <Content Include="TestFiles\FileDirList.xml" />
+    <Content Include="TestFiles\FileDisableShare.xml" />
+    <Content Include="TestFiles\FileEnableShare.xml" />
     <Content Include="TestFiles\FileIncomplete.xml" />
     <Content Include="TestFiles\FileMovePostResponse.xml" />
     <Content Include="TestFiles\FileUploadPostResponse.xml" />
@@ -98,7 +99,7 @@
       <SubType>Designer</SubType>
     </Content>
     <Content Include="TestFiles\MountPointCreatePostResponse.xml" />
-    <Content Include="TestFiles\MountPointDeletePermantPostResponse.xml" />
+    <Content Include="TestFiles\MountPointDeletePermanentPostResponse.xml" />
     <Content Include="TestFiles\SearchResult.xml" />
     <Content Include="TestFiles\Trash.xml" />
     <Content Include="TestFiles\User.xml" />
