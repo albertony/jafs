@@ -4,6 +4,7 @@ using System.IO;
 using System.Text;
 using System.Xml.Serialization;
 using System.Net;
+using System.Collections.ObjectModel;
 
 namespace JaFS
 {
@@ -171,8 +172,9 @@ namespace JaFS
             }
             DeleteDevicePermanently(device.Name);
         }
-        public JFSObject GetObject(string path, bool includeDeleted = false)
+        public Collection<JFSObject> GetPathObjects(string path, bool includeDeleted = false)
         {
+            Collection<JFSObject> result = new Collection<JFSObject>();
             string deviceName, mountPointName, theName;
             string[] folderNames;
             ParsePath(path, out deviceName, out mountPointName, out folderNames, out theName);
@@ -182,12 +184,14 @@ namespace JaFS
                 if (device == null)
                     throw new ArgumentException("Device \"" + deviceName + "\" not found!");
                 device.FetchCompleteData();
+                result.Add(device);
                 if (mountPointName != "")
                 {
                     var mountPoint = device.GetMountPoint(mountPointName, includeDeleted);
                     if (mountPoint == null)
                         throw new ArgumentException("Mount point \"" + mountPointName + "\" not found!");
                     mountPoint.FetchCompleteData();
+                    result.Add(mountPoint);
                     if (folderNames.LongLength > 0)
                     {
                         var folderName = folderNames[0];
@@ -195,6 +199,7 @@ namespace JaFS
                         if (folder == null)
                             throw new ArgumentException("Folder \"" + folderName + "\" not found!");
                         folder.FetchCompleteData();
+                        result.Add(folder);
                         for (long i = 1; i < folderNames.LongLength; i++)
                         {
                             folderName = folderNames[i];
@@ -202,6 +207,7 @@ namespace JaFS
                             if (folder == null)
                                 throw new ArgumentException("Folder \"" + folderName + "\" not found!");
                             folder.FetchCompleteData();
+                            result.Add(folder);
                         }
                         if (theName != "")
                         {
@@ -213,14 +219,16 @@ namespace JaFS
                                 if (folder == null)
                                     throw new ArgumentException("File or folder \"" + theName + "\" not found!");
                                 folder.FetchCompleteData();
-                                return folder;
+                                result.Add(folder);
                             }
-                            file.FetchCompleteData();
-                            return file;
+                            else
+                            {
+                                file.FetchCompleteData();
+                                result.Add(file);
+                            }
                         }
-                        return folder;
                     }
-                    if (theName != "")
+                    else if (theName != "")
                     {
                         // Could be a folder or a file
                         var file = mountPoint.GetFile(theName, includeDeleted);
@@ -230,16 +238,17 @@ namespace JaFS
                             if (folder == null)
                                 throw new ArgumentException("File or folder \"" + theName + "\" not found!");
                             folder.FetchCompleteData();
-                            return folder;
+                            result.Add(folder);
                         }
-                        file.FetchCompleteData();
-                        return file;
+                        else
+                        {
+                            file.FetchCompleteData();
+                            result.Add(file);
+                        }
                     }
-                    return mountPoint;
                 }
-                return device;
             }
-            return null;
+            return result;
         }
 
         public JFSTrash GetTrash()

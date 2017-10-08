@@ -55,7 +55,7 @@ works and what doesn't (just add a [issue](https://github.com/albertony/jafs/iss
 Installation
 ============
 
-Source code is in C#, with Visual Studio 2015 project targeting .NET framework version 4.5.2,
+Source code is in C#, with Visual Studio 2017 project targeting .NET framework version 4.6.1,
 building as "Any CPU". Add as project reference, or build it and add assembly reference, to
 your own project.
 

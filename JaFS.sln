@@ -1,11 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.25420.1
+# Visual Studio 15
+VisualStudioVersion = 15.0.26730.16
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JottacloudFileSystem", "JottacloudFileSystem\JottacloudFileSystem.csproj", "{EDCD0380-5C21-4160-87FE-A3A33E8ED699}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataParsingTests", "Tests\DataParsingTests\DataParsingTests.csproj", "{856D8096-D642-4A98-BC9E-B32824FD1428}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JottacloudPSProvider", "JottacloudPSProvider\JottacloudPSProvider.csproj", "{006BB7F6-796A-450C-B13F-A14EB678FE84}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,8 +23,15 @@ Global
 		{856D8096-D642-4A98-BC9E-B32824FD1428}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{856D8096-D642-4A98-BC9E-B32824FD1428}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{856D8096-D642-4A98-BC9E-B32824FD1428}.Release|Any CPU.Build.0 = Release|Any CPU
+		{006BB7F6-796A-450C-B13F-A14EB678FE84}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{006BB7F6-796A-450C-B13F-A14EB678FE84}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{006BB7F6-796A-450C-B13F-A14EB678FE84}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{006BB7F6-796A-450C-B13F-A14EB678FE84}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {83967B21-7991-43A1-A4F3-28FD0E1744D6}
 	EndGlobalSection
 EndGlobal
