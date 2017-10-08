@@ -62,7 +62,10 @@ your own project.
 
 ### PowerShell
 
-One neat tip is to load the library into a Windows PowerShell session by `Add-Type -Path <PathToLibrary>`,
+#### Using the main C# library from PowerShell
+
+One neat tip is to load the main C# library (`JottacloudFileSystem.dll`) into a Windows PowerShell
+session by `Add-Type -Path <PathToLibrary>`,
 and then you can use the functonality from an interactive shell. If you are on PowerShell 5.0
 or newer you can execute `using namespace JaFS`
 
@@ -75,6 +78,29 @@ $jafs.AutoFetchCompleteData = $true
 $mnt = $jafs.GetBuiltInDevice().GetMountPoint("Archive")
 $mnt.GetFileTree()
 ```
+
+#### Using the PowerShell Provider
+
+Work has started on wrapping the main C# library (`JottacloudFileSystem.dll`) in a
+PowerShell provider library (`JottacloudPSProvider.dll`), so that you can use the
+familiar commands such as Get-Item, New-Item and Remove-Item to manipulate devices,
+mount points and folders in Jottacloud:
+
+```
+[Reflection.Assembly]::LoadFrom("JottacloudPSProvider.dll") | Import-Module
+New-PSDrive -Name JAFS -PSProvider JottacloudPSProvider -Root \ -Credential (Get-Credential)
+Test-Path JAFS:\PC001
+Get-Item JAFS:\PC001\Backup
+Get-ChildItem JAFS:\PC001\Backup
+New-item "JAFS:" -ItemType device -Value PSProviderTestDev -DeviceType LAPTOP
+New-item "JAFS:\PSProviderTestDev" -ItemType mountpoint -Value PSProviderTestMount
+New-item "JAFS:\PSProviderTestDev\PSProviderTestMount" -ItemType folder -Value PSProviderTestFolder
+Remove-item JAFS:\PSProviderTestDev\PSProviderTestMount\PSProviderTestFolder
+Remove-item JAFS:\PSProviderTestDev\PSProviderTestMount
+Remove-item JAFS:\PSProviderTestDev -Permanent
+```
+
+Note that this is on an even earlier stage than the main C# library!
 
 Usage
 =====
@@ -229,6 +255,10 @@ also highly appreciated.
 
 History
 =======
+
+### Version 0.1.1
+
+Added PowerShell Provider library.
 
 ### Version 0.1
 
