@@ -9,6 +9,7 @@ using System.Collections.ObjectModel;
 using JaFS;
 using System.Net;
 using System.IO;
+using System.Collections;
 
 
 //
@@ -16,77 +17,66 @@ using System.IO;
 //
 namespace JottacloudPSProvider
 {
-    internal class JottacloudPSDriveInfo : PSDriveInfo
-    {
-        Jottacloud jafs;
-        public JottacloudPSDriveInfo(PSDriveInfo driveInfo) : base(driveInfo)
-        {
-        }
-        public Jottacloud JAFS
-        {
-            get { return this.jafs; }
-            set { this.jafs = value; }
-        }
-    }
-    internal sealed class NewItemDynamicParameters
-    {
-        [Parameter()]
-        public JFSData.JFSDataDeviceType DeviceType { get; set; }
-    }
-    internal sealed class RemoveItemDynamicParameters
-    {
-        [Parameter()]
-        public SwitchParameter Permanent { get; set; }
-    }
+    #region Provider class (JottacloudPSProvider)
+
     [CmdletProvider("JottacloudPSProvider", ProviderCapabilities.ShouldProcess | ProviderCapabilities.Credentials)]
-    public class JottacloudPSProvider : NavigationCmdletProvider
+    public class JottacloudPSProvider : NavigationCmdletProvider, IContentCmdletProvider
     {
         #region DriveCmdletProvider
 
         //protected override Collection<PSDriveInfo> InitializeDefaultDrives()
         protected override PSDriveInfo NewDrive(PSDriveInfo drive)
         {
-            // Check if the drive object is null.
+            JottacloudPSDriveInfo jedi = null;
             if (drive == null)
             {
                 WriteError(new ErrorRecord(new ArgumentNullException("drive"), "NullDrive", ErrorCategory.InvalidArgument, null));
-                return null;
             }
             // Check if the drive root is not null or empty and if it is valid.
-            /*if (String.IsNullOrEmpty(drive.Root))
+            /*else if (String.IsNullOrEmpty(drive.Root))
             {
                 WriteError(new ErrorRecord(new ArgumentException("drive.Root"), "NoRoot", ErrorCategory.InvalidArgument, drive));
                 return null;
             }*/
-            // Check if credentials are specified
-            if (drive.Credential == null)
+            else if (drive.Credential == null)
             {
-                WriteError(new ErrorRecord(new ArgumentException("drive.Credential"), "NoCredential", ErrorCategory.InvalidArgument, drive));
-                return null;
+                WriteError(new ErrorRecord(new ArgumentNullException("drive.Credential"), "NoCredential", ErrorCategory.InvalidArgument, drive));
             }
-            // Create a new drive and create an ODBC connection to the new drive.
-            JottacloudPSDriveInfo jedi = new JottacloudPSDriveInfo(drive);
-            Jottacloud jafs = new Jottacloud((NetworkCredential)drive.Credential);
-            jedi.JAFS = jafs;
+            else
+            {
+                // Create a new drive and create an ODBC connection to the new drive.
+                jedi = new JottacloudPSDriveInfo(drive);
+                Jottacloud jafs = new Jottacloud((NetworkCredential)drive.Credential);
+                jafs.ClientMountRoot = jedi.Name;
+                jafs.ClientMountPathSeparator = PSPathSeparator;
+                jedi.JAFS = jafs;
+            }
             return jedi;
         }
         //protected override object NewDriveDynamicParameters();
         protected override PSDriveInfo RemoveDrive(PSDriveInfo drive)
         {
-            // Check if drive object is null.
+            JottacloudPSDriveInfo jedi = null;
             if (drive == null)
             {
                 WriteError(new ErrorRecord(new ArgumentNullException("drive"), "NullDrive", ErrorCategory.InvalidArgument, drive));
                 return null;
             }
-            // Close the JAFS connection to the drive.
-            JottacloudPSDriveInfo jedi = drive as JottacloudPSDriveInfo;
-            if (jedi == null)
+            else
             {
-                return null;
+                // Close the JAFS connection to the drive.
+                jedi = drive as JottacloudPSDriveInfo;
+                if (jedi == null)
+                {
+                    WriteError(new ErrorRecord(new ArgumentException("Specified drive is not handled by JottacloudPSProvider"), "InvalidDrive", ErrorCategory.InvalidArgument, drive));
+                    return null;
+                }
+                else
+                {
+                    //jedi.JAFS.Close();  // TODO: Currently no persistant connection!
+                    return jedi;
+                }
             }
-            //jedi.JAFS.Close();  // TODO: Currently no persistant connection!
-            return jedi;
         }
 
         #endregion
@@ -102,17 +92,12 @@ namespace JottacloudPSProvider
             {
                 WriteItemObject(this.PSDriveInfo, path, true);
             }
-            JottacloudPSDriveInfo jedi = this.PSDriveInfo as JottacloudPSDriveInfo;
-            try
+            else
             {
-                Collection<JFSObject> pathObjects = jedi.JAFS.GetPathObjects(JAFSPath(path));
+                Collection<JFSObject> pathObjects = JAFS.GetPathObjects(JAFSPath(path));
                 JFSObject job = pathObjects.Count > 0 ? pathObjects[pathObjects.Count - 1] : null;
                 bool isContainer = !(job is JFSBasicFile);
                 WriteItemObject(job, path, isContainer);
-            }
-            catch (ArgumentException ex)
-            {
-                throw ex;
             }
         }
         //protected virtual object GetItemDynamicParameters(string path);
@@ -120,7 +105,14 @@ namespace JottacloudPSProvider
         //protected virtual object InvokeDefaultActionDynamicParameters(string path);
         protected override bool IsValidPath(string path)
         {
-            return true;
+            if (PathIsDrive(path))
+            {
+                return false;
+            }
+            else
+            {
+                return JAFS.IsValidPath(path);
+            }
         }
         protected override bool ItemExists(string path)
         {
@@ -128,22 +120,30 @@ namespace JottacloudPSProvider
             {
                 return true;
             }
-            JottacloudPSDriveInfo jedi = this.PSDriveInfo as JottacloudPSDriveInfo;
-            try
+            else
             {
-                Collection<JFSObject> pathObjects = jedi.JAFS.GetPathObjects(JAFSPath(path));
-                JFSObject job = pathObjects.Count > 0 ? pathObjects[pathObjects.Count - 1] : null;
+                JFSObject job = null;
+                try
+                {
+                    Collection<JFSObject> pathObjects = JAFS.GetPathObjects(JAFSPath(path));
+                    if (pathObjects.Count > 0)
+                    {
+                        job = pathObjects[pathObjects.Count - 1];
+                    }
+                }
+                catch (ArgumentException)
+                {
+                    // Expecting JAFS.GetPathObjects to throw for path that does not exist, which is normal.
+                }
                 return job != null;
-            }
-            catch (ArgumentException ex)
-            {
-                return false;
             }
         }
 
         #endregion
-
         //protected virtual object ItemExistsDynamicParameters(string path);
+
+        // SetItem method of the item provider interface is not implemented, using SetContent
+        // from content provider interface instead, same as the built-in FileSystem provider.
         //protected virtual void SetItem(string path, object value);
         //protected virtual object SetItemDynamicParameters(string path, object value);
 
@@ -154,17 +154,16 @@ namespace JottacloudPSProvider
         //protected virtual object CopyItemDynamicParameters(string path, string destination, bool recurse);
         protected override void GetChildItems(string path, bool recurse)
         {
-            JottacloudPSDriveInfo jedi = this.PSDriveInfo as JottacloudPSDriveInfo;
             if (PathIsDrive(path))
             {
-                foreach (var deviceName in jedi.JAFS.GetDeviceNames())
+                foreach (var deviceName in JAFS.GetDeviceNames())
                 {
                     WriteItemObject(deviceName, path, true);
                 }
             }
-            try
+            else
             {
-                Collection<JFSObject> pathObjects = jedi.JAFS.GetPathObjects(JAFSPath(path));
+                Collection<JFSObject> pathObjects = JAFS.GetPathObjects(JAFSPath(path));
                 JFSObject job = pathObjects.Count > 0 ? pathObjects[pathObjects.Count - 1] : null;
                 if (job is JFSDevice)
                 {
@@ -183,7 +182,7 @@ namespace JottacloudPSProvider
                     }
                     foreach (var filName in mnt.GetFileNames())
                     {
-                        WriteItemObject(filName, path, true);
+                        WriteItemObject(filName, path, false);
                     }
                 }
                 else if (job is JFSFolder)
@@ -195,22 +194,18 @@ namespace JottacloudPSProvider
                     }
                     foreach (var filName in fol.GetFileNames())
                     {
-                        WriteItemObject(filName, path, true);
+                        WriteItemObject(filName, path, false);
                     }
                 }
                 else if (job is JFSBasicFile)
                 {
                     JFSBasicFile fil = job as JFSBasicFile;
-                    WriteItemObject(fil.Name, path, true);
+                    WriteItemObject(fil.Name, path, false);
                 }
                 else
                 {
                     throw new ArgumentException("Invalid path");
                 }
-            }
-            catch (ArgumentException ex)
-            {
-                throw ex;
             }
         }
         //protected virtual object GetChildItemsDynamicParameters(string path, bool recurse);
@@ -225,8 +220,7 @@ namespace JottacloudPSProvider
             {
                 return true;
             }
-            JottacloudPSDriveInfo jedi = this.PSDriveInfo as JottacloudPSDriveInfo;
-            Collection<JFSObject> pathObjects = jedi.JAFS.GetPathObjects(JAFSPath(path));
+            Collection<JFSObject> pathObjects = JAFS.GetPathObjects(JAFSPath(path));
             JFSObject job = pathObjects.Count > 0 ? pathObjects[pathObjects.Count - 1] : null;
             if (job != null)
             {
@@ -271,14 +265,13 @@ namespace JottacloudPSProvider
             {
                 throw new ArgumentException("Value argument must be name of the item to be created");
             }
-            JottacloudPSDriveInfo jedi = this.PSDriveInfo as JottacloudPSDriveInfo;
             if (String.Equals(itemTypeName, "device", StringComparison.OrdinalIgnoreCase))
             {
                 if (PathIsDrive(path))
                 {
                     if (ShouldProcess(itemName, "New device"))
                     {
-                        jedi.JAFS.NewDevice(itemName, parameters.DeviceType);
+                        WriteItemObject(JAFS.NewDevice(itemName, parameters.DeviceType), path + PSPathSeparator + itemName, true);
                     }
                 }
                 else
@@ -290,13 +283,13 @@ namespace JottacloudPSProvider
             {
                 if (!PathIsDrive(path))
                 {
-                    Collection<JFSObject> pathObjects = jedi.JAFS.GetPathObjects(JAFSPath(path));
+                    Collection<JFSObject> pathObjects = JAFS.GetPathObjects(JAFSPath(path));
                     JFSDevice dev = pathObjects.Count > 0 ? pathObjects[pathObjects.Count - 1] as JFSDevice : null;
                     if (dev != null)
                     {
                         if (ShouldProcess(itemName, "New mount point"))
                         {
-                            dev.NewMountpoint(itemName);
+                            WriteItemObject(dev.NewMountpoint(itemName), path + PSPathSeparator + itemName, true);
                         }
                     }
                     else
@@ -313,7 +306,7 @@ namespace JottacloudPSProvider
             {
                 if (!PathIsDrive(path))
                 {
-                    Collection<JFSObject> pathObjects = jedi.JAFS.GetPathObjects(JAFSPath(path));
+                    Collection<JFSObject> pathObjects = JAFS.GetPathObjects(JAFSPath(path));
                     JFSObject job = pathObjects.Count > 0 ? pathObjects[pathObjects.Count - 1] : null;
                     if (job is JFSMountPoint)
                     {
@@ -322,7 +315,7 @@ namespace JottacloudPSProvider
                         {
                             if (ShouldProcess(itemName, "New folder"))
                             {
-                                mnt.NewFolder(itemName);
+                                WriteItemObject(mnt.NewFolder(itemName), path + PSPathSeparator + itemName, true);
                             }
                         }
                     }
@@ -333,7 +326,7 @@ namespace JottacloudPSProvider
                         {
                             if (ShouldProcess(itemName, "New folder"))
                             {
-                                pf.NewFolder(itemName);
+                                WriteItemObject(pf.NewFolder(itemName), path + PSPathSeparator + itemName, true);
                             }
                         }
 
@@ -346,6 +339,45 @@ namespace JottacloudPSProvider
                 else
                 {
                     throw new ArgumentException("A folder can only be created from a mount point or folder and the specified path does not represent one");
+                }
+            }
+            else if (String.Equals(itemTypeName, "file", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!PathIsDrive(path))
+                {
+                    Collection<JFSObject> pathObjects = JAFS.GetPathObjects(JAFSPath(path));
+                    JFSObject job = pathObjects.Count > 0 ? pathObjects[pathObjects.Count - 1] : null;
+                    if (job is JFSMountPoint)
+                    {
+                        JFSMountPoint mnt = job as JFSMountPoint;
+                        if (mnt != null)
+                        {
+                            if (ShouldProcess(itemName, "New file"))
+                            {
+                                WriteItemObject(mnt.NewFile(itemName, new byte[0]), path + PSPathSeparator + itemName, false);
+                            }
+                        }
+                    }
+                    else if (job is JFSFolder)
+                    {
+                        JFSFolder pf = job as JFSFolder;
+                        if (pf != null)
+                        {
+                            if (ShouldProcess(itemName, "New file"))
+                            {
+                                WriteItemObject(pf.NewFile(itemName, new byte[0]), path + PSPathSeparator + itemName, false);
+                            }
+                        }
+
+                    }
+                    else
+                    {
+                        throw new ArgumentException("A file can only be created from a mount point or folder and the specified path does not represent one");
+                    }
+                }
+                else
+                {
+                    throw new ArgumentException("A file can only be created from a mount point or folder and the specified path does not represent one");
                 }
             }
             else
@@ -364,148 +396,129 @@ namespace JottacloudPSProvider
             RemoveItemDynamicParameters parameters = DynamicParameters as RemoveItemDynamicParameters;
             if (PathIsDrive(path))
             {
-                WriteItemObject(this.PSDriveInfo, path, true);
+                throw new ArgumentException("Remove not supported for this item");
             }
-            JottacloudPSDriveInfo jedi = this.PSDriveInfo as JottacloudPSDriveInfo;
-            try
+            Collection<JFSObject> pathObjects = JAFS.GetPathObjects(JAFSPath(path));
+            JFSObject job = pathObjects.Count > 0 ? pathObjects[pathObjects.Count - 1] : null;
+            if (job is JFSDevice)
             {
-                Collection<JFSObject> pathObjects = jedi.JAFS.GetPathObjects(JAFSPath(path));
-                JFSObject job = pathObjects.Count > 0 ? pathObjects[pathObjects.Count - 1] : null;
-                if (job is JFSDevice)
+                JFSDevice dev = job as JFSDevice;
+                if (parameters.Permanent)
                 {
-                    JFSDevice dev = job as JFSDevice;
-                    if (parameters.Permanent)
+                    if (ShouldProcess(path, "RemoveItem"))
                     {
-                        if (ShouldProcess(path, "RemoveItem"))
-                        {
-                            WriteItemObject(dev, path, false);
-                            jedi.JAFS.DeleteDevicePermanently(dev);
-                        }
-                    }
-                    else
-                    {
-                        throw new ArgumentException("Devices can only be removed permanently");
+                        JAFS.DeleteDevicePermanently(dev);
                     }
                 }
-                else if (job is JFSMountPoint)
+                else
                 {
-                    JFSMountPoint mnt = job as JFSMountPoint;
-                    if (parameters.Permanent)
+                    throw new ArgumentException("Devices can only be removed permanently");
+                }
+            }
+            else if (job is JFSMountPoint)
+            {
+                JFSMountPoint mnt = job as JFSMountPoint;
+                if (parameters.Permanent)
+                {
+                    JFSDevice dev = pathObjects.Count > 1 ? pathObjects[pathObjects.Count - 2] as JFSDevice : null; // Parent is the device
+                    if (dev == null)
                     {
-                        JFSDevice dev = pathObjects.Count > 1 ? pathObjects[pathObjects.Count - 2] as JFSDevice : null; // Parent is the device
-                        if (dev == null)
+                        throw new ArgumentException("Failed to find parent item needed for permanent remove");
+                    }
+                    if (ShouldProcess(path, "RemoveItem"))
+                    {
+                        dev.DeleteMountPointPermanently(mnt);
+                    }
+                }
+                else
+                {
+                    if (ShouldProcess(path, "RemoveItem"))
+                    {
+                        mnt.Delete();
+                    }
+                }
+            }
+            else if (job is JFSFolder)
+            {
+                JFSFolder fol = job as JFSFolder;
+                if (parameters.Permanent)
+                {
+                    JFSObject parent = pathObjects.Count > 1 ? pathObjects[pathObjects.Count - 2] : null;
+                    if (parent is JFSMountPoint)
+                    {
+                        JFSMountPoint mnt = parent as JFSMountPoint;
+                        if (mnt == null)
                         {
                             throw new ArgumentException("Failed to find parent item needed for permanent remove");
                         }
                         if (ShouldProcess(path, "RemoveItem"))
                         {
-                            WriteItemObject(mnt, path, false);
-                            dev.DeleteMountPointPermanently(mnt);
+                            mnt.DeleteFolderPermanently(fol);
                         }
                     }
-                    else
+                    else if (parent is JFSFolder)
                     {
+                        JFSFolder pf = parent as JFSFolder;
+                        if (pf == null)
+                        {
+                            throw new ArgumentException("Failed to find parent item needed for permanent remove");
+                        }
                         if (ShouldProcess(path, "RemoveItem"))
                         {
-                            WriteItemObject(mnt, path, false);
-                            mnt.Delete();
-                        }
-                    }
-                }
-                else if (job is JFSFolder)
-                {
-                    JFSFolder fol = job as JFSFolder;
-                    if (parameters.Permanent)
-                    {
-                        JFSObject parent = pathObjects.Count > 1 ? pathObjects[pathObjects.Count - 2] : null;
-                        if (parent is JFSMountPoint)
-                        {
-                            JFSMountPoint mnt = parent as JFSMountPoint;
-                            if (mnt == null)
-                            {
-                                throw new ArgumentException("Failed to find parent item needed for permanent remove");
-                            }
-                            if (ShouldProcess(path, "RemoveItem"))
-                            {
-                                WriteItemObject(fol, path, false);
-                                mnt.DeleteFolderPermanently(fol);
-                            }
-                        }
-                        else if (parent is JFSFolder)
-                        {
-                            JFSFolder pf = parent as JFSFolder;
-                            if (pf == null)
-                            {
-                                throw new ArgumentException("Failed to find parent item needed for permanent remove");
-                            }
-                            if (ShouldProcess(path, "RemoveItem"))
-                            {
-                                WriteItemObject(fol, path, false);
-                                pf.DeleteFolderPermanently(fol);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        if (ShouldProcess(path, "RemoveItem"))
-                        {
-                            WriteItemObject(fol, path, false);
-                            fol.Delete();
-                        }
-                    }
-                }
-                else if (job is JFSFile)
-                {
-                    JFSFile fil = job as JFSFile;
-                    if (parameters.Permanent)
-                    {
-                        JFSObject parent = pathObjects.Count > 1 ? pathObjects[pathObjects.Count - 2] : null;
-                        if (parent is JFSMountPoint)
-                        {
-                            JFSMountPoint mnt = parent as JFSMountPoint;
-                            if (mnt == null)
-                            {
-                                throw new ArgumentException("Failed to find parent item needed for permanent remove");
-                            }
-                            if (ShouldProcess(path, "RemoveItem"))
-                            {
-                                WriteItemObject(fil, path, false);
-                                mnt.DeleteFilePermanently(fil);
-                            }
-                        }
-                        else if (parent is JFSFolder)
-                        {
-                            JFSFolder pf = parent as JFSFolder;
-                            if (pf == null)
-                            {
-                                throw new ArgumentException("Failed to find parent item needed for permanent remove");
-                            }
-                            if (ShouldProcess(path, "RemoveItem"))
-                            {
-                                WriteItemObject(fil, path, false);
-                                pf.DeleteFilePermanently(fil);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        if (ShouldProcess(path, "RemoveItem"))
-                        {
-                            WriteItemObject(fil, path, false);
-                            fil.Delete();
+                            pf.DeleteFolderPermanently(fol);
                         }
                     }
                 }
                 else
                 {
-                    ArgumentException e = new ArgumentException("Rename not supported for this item");
-                    //WriteError(new ErrorRecord(e, "MoveNotSupported", ErrorCategory.InvalidArgument, path));
-                    throw e;
+                    if (ShouldProcess(path, "RemoveItem"))
+                    {
+                        fol.Delete();
+                    }
                 }
             }
-            catch (ArgumentException ex)
+            else if (job is JFSFile)
             {
-                throw ex;
+                JFSFile fil = job as JFSFile;
+                if (parameters.Permanent)
+                {
+                    JFSObject parent = pathObjects.Count > 1 ? pathObjects[pathObjects.Count - 2] : null;
+                    if (parent is JFSMountPoint)
+                    {
+                        JFSMountPoint mnt = parent as JFSMountPoint;
+                        if (mnt == null)
+                        {
+                            throw new ArgumentException("Failed to find parent item needed for permanent remove");
+                        }
+                        if (ShouldProcess(path, "RemoveItem"))
+                        {
+                            mnt.DeleteFilePermanently(fil);
+                        }
+                    }
+                    else if (parent is JFSFolder)
+                    {
+                        JFSFolder pf = parent as JFSFolder;
+                        if (pf == null)
+                        {
+                            throw new ArgumentException("Failed to find parent item needed for permanent remove");
+                        }
+                        if (ShouldProcess(path, "RemoveItem"))
+                        {
+                            pf.DeleteFilePermanently(fil);
+                        }
+                    }
+                }
+                else
+                {
+                    if (ShouldProcess(path, "RemoveItem"))
+                    {
+                        fil.Delete();
+                    }
+                }
+            }
+            else
+            {
+                throw new ArgumentException("Remove not supported for this item");
             }
         }
         protected override object RemoveItemDynamicParameters(string path, bool recurse)
@@ -518,41 +531,31 @@ namespace JottacloudPSProvider
             {
                 WriteItemObject(this.PSDriveInfo, path, true);
             }
-            JottacloudPSDriveInfo jedi = this.PSDriveInfo as JottacloudPSDriveInfo;
-            try
+            Collection<JFSObject> pathObjects = JAFS.GetPathObjects(JAFSPath(path));
+            JFSObject job = pathObjects.Count > 0 ? pathObjects[pathObjects.Count - 1] : null;
+            if (job is JFSFolder)
             {
-                Collection<JFSObject> pathObjects = jedi.JAFS.GetPathObjects(JAFSPath(path));
-                JFSObject job = pathObjects.Count > 0 ? pathObjects[pathObjects.Count - 1] : null;
-                if (job is JFSFolder)
+                JFSFolder fol = job as JFSFolder;
+                if (ShouldProcess(path, "RenameItem"))
                 {
-                    JFSFolder fol = job as JFSFolder;
-                    if (ShouldProcess(path, "RenameItem"))
-                    {
-                        WriteItemObject(fol, path, false);
-                        fol.Rename(newName);
-                    }
+                    WriteItemObject(fol, path, false);
+                    fol.Rename(newName);
                 }
-                else if (job is JFSFile)
-                {
-                    JFSFile fil = job as JFSFile;
-                    if (ShouldProcess(path, "RenameItem"))
-                    {
-                        WriteItemObject(fil, path, false);
-                        fil.Rename(newName);
-                    }
-                }
-                else
-                {
-                    ArgumentException e = new ArgumentException("Rename not supported for this item");
-                    //WriteError(new ErrorRecord(e, "MoveNotSupported", ErrorCategory.InvalidArgument, path));
-                    throw e;
-                }
-                WriteItemObject(job, path, true);
             }
-            catch (ArgumentException ex)
+            else if (job is JFSFile)
             {
-                throw ex;
+                JFSFile fil = job as JFSFile;
+                if (ShouldProcess(path, "RenameItem"))
+                {
+                    WriteItemObject(fil, path, false);
+                    fil.Rename(newName);
+                }
             }
+            else
+            {
+                throw new ArgumentException("Rename not supported for this item");
+            }
+            WriteItemObject(job, path, true);
         }
         //protected virtual object RenameItemDynamicParameters(string path, string newName);
 
@@ -568,8 +571,7 @@ namespace JottacloudPSProvider
             {
                 return true;
             }
-            JottacloudPSDriveInfo jedi = this.PSDriveInfo as JottacloudPSDriveInfo;
-            Collection<JFSObject> pathObjects = jedi.JAFS.GetPathObjects(JAFSPath(path));
+            Collection<JFSObject> pathObjects = JAFS.GetPathObjects(JAFSPath(path));
             JFSObject job = pathObjects.Count > 0 ? pathObjects[pathObjects.Count - 1] : null;
             return job != null && !(job is JFSBasicFile);
         }
@@ -581,48 +583,86 @@ namespace JottacloudPSProvider
             {
                 WriteItemObject(this.PSDriveInfo, path, true);
             }
-            JottacloudPSDriveInfo jedi = this.PSDriveInfo as JottacloudPSDriveInfo;
-            try
+            Collection<JFSObject> pathObjects = JAFS.GetPathObjects(JAFSPath(path));
+            JFSObject job = pathObjects.Count > 0 ? pathObjects[pathObjects.Count - 1] : null;
+            if (job is JFSFolder)
             {
-                Collection<JFSObject> pathObjects = jedi.JAFS.GetPathObjects(JAFSPath(path));
-                JFSObject job = pathObjects.Count > 0 ? pathObjects[pathObjects.Count - 1] : null;
-                if (job is JFSFolder)
+                JFSFolder fol = job as JFSFolder;
+                if (ShouldProcess(path, "MoveItem"))
                 {
-                    JFSFolder fol = job as JFSFolder;
-                    if (ShouldProcess(path, "MoveItem"))
-                    {
-                        WriteItemObject(fol, path, false);
-                        fol.Move(JAFSPath(destination));
-                    }
+                    WriteItemObject(fol, path, false);
+                    fol.Move(JAFSPath(destination));
                 }
-                else if (job is JFSFile)
-                {
-                    JFSFile fil = job as JFSFile;
-                    if (ShouldProcess(path, "MoveItem"))
-                    {
-                        WriteItemObject(fil, path, false);
-                        fil.Move(JAFSPath(destination));
-                    }
-                }
-                else
-                {
-                    ArgumentException e = new ArgumentException("Move not supported for this item");
-                    //WriteError(new ErrorRecord(e, "MoveNotSupported", ErrorCategory.InvalidArgument, path));
-                    throw e;
-                }
-                WriteItemObject(job, path, true);
             }
-            catch (ArgumentException ex)
+            else if (job is JFSFile)
             {
-                throw ex;
+                JFSFile fil = job as JFSFile;
+                if (ShouldProcess(path, "MoveItem"))
+                {
+                    WriteItemObject(fil, path, false);
+                    fil.Move(JAFSPath(destination));
+                }
             }
+            else
+            {
+                ArgumentException e = new ArgumentException("Move not supported for this item");
+                //WriteError(new ErrorRecord(e, "MoveNotSupported", ErrorCategory.InvalidArgument, path));
+                throw e;
+            }
+            WriteItemObject(job, path, true);
         }
         //protected virtual object MoveItemDynamicParameters(string path, string destination);
         //protected virtual string NormalizeRelativePath(string path, string basePath);
 
+
+        #region IContentCmdletProvider
+
+        public void ClearContent(string path)
+        {
+            // TODO!
+        }
+        public object ClearContentDynamicParameters(string path)
+        {
+            return null;
+        }
+        public IContentReader GetContentReader(string path)
+        {
+            return new JottacloudPSContentReaderWriter(path, this);
+        }
+        public object GetContentReaderDynamicParameters(string path)
+        {
+            return null;
+        }
+        public IContentWriter GetContentWriter(string path)
+        {
+            return new JottacloudPSContentReaderWriter(path, this);
+        }
+        public object GetContentWriterDynamicParameters(string path)
+        {
+            return null;
+        }
+
+        #endregion
+
         #endregion
 
         #region Helper Methods
+
+        private Jottacloud JAFS
+        {
+            get
+            {
+                JottacloudPSDriveInfo jedi = this.PSDriveInfo as JottacloudPSDriveInfo;
+                if (jedi == null)
+                {
+                    return null;
+                }
+                else
+                {
+                    return jedi.JAFS;
+                }
+            }
+        }
 
         // Adapts the path, making sure the correct path separator
         private string JAFSPath(string path)
@@ -643,7 +683,12 @@ namespace JottacloudPSProvider
             // it is a drive. Also if its just a drive then there wont be any path separators
             return String.IsNullOrEmpty(path.Replace(this.PSDriveInfo.Root, "")) ||
                    String.IsNullOrEmpty(path.Replace(this.PSDriveInfo.Root + PSPathSeparator, ""));
-        } // PathIsDrive
+        }
+
+        public Collection<JFSObject> GetPathObjects(string path)
+        {
+            return JAFS.GetPathObjects(JAFSPath(path));
+        }
 
         #region Private Properties
 
@@ -655,4 +700,198 @@ namespace JottacloudPSProvider
         #endregion
 
     }
+
+    #endregion
+
+    #region Helper classes
+
+    #region Drive info class
+
+    internal class JottacloudPSDriveInfo : PSDriveInfo
+    {
+        Jottacloud jafs;
+        public JottacloudPSDriveInfo(PSDriveInfo driveInfo) : base(driveInfo)
+        {
+        }
+        public Jottacloud JAFS
+        {
+            get { return this.jafs; }
+            set { this.jafs = value; }
+        }
+    }
+
+    #endregion
+
+    #region Dynamic parameter classes
+
+    internal sealed class NewItemDynamicParameters
+    {
+        [Parameter()]
+        public JFSData.JFSDataDeviceType DeviceType { get; set; }
+    }
+    internal sealed class RemoveItemDynamicParameters
+    {
+        [Parameter()]
+        public SwitchParameter Permanent { get; set; }
+    }
+
+    #endregion
+
+    #region Content reader/writer
+
+    internal class JottacloudPSContentReaderWriter : IContentReader, IContentWriter
+    {
+        private JottacloudPSProvider provider;
+        private string path;
+        private ulong currentOffset;
+
+        internal JottacloudPSContentReaderWriter(string path, JottacloudPSProvider provider)
+        {
+            this.path = path;
+            this.provider = provider;
+        }
+
+        public IList Read(long readCount)
+        {
+            ArrayList blocks = new ArrayList();
+            Collection<JFSObject> pathObjects = provider.GetPathObjects(path);
+            JFSObject job = pathObjects.Count > 0 ? pathObjects[pathObjects.Count - 1] : null;
+            if (job is JFSFile)
+            {
+                JFSFile fil = job as JFSFile;
+                if (currentOffset > fil.SizeInBytes)
+                {
+                    return null;
+                }
+                if (currentOffset == 0 && readCount <= 0)
+                {
+                    // Read everything
+                    blocks.AddRange(fil.Read().ToCharArray());
+                }
+                else
+                {
+                    ulong endPos = fil.SizeInBytes;
+                    if (readCount > 0)
+                    {
+                        endPos = currentOffset + (ulong)readCount;
+                        if (endPos > fil.SizeInBytes)
+                        {
+                            endPos = fil.SizeInBytes;
+                        }
+                    }
+                    blocks.AddRange(fil.ReadPartial(currentOffset, endPos).ToCharArray());
+                }
+                return blocks;
+            }
+            else
+            {
+                return null;
+            }
+        }
+
+        public IList Write(IList content)
+        {
+            Collection<JFSObject> pathObjects = provider.GetPathObjects(path);
+            JFSObject job = pathObjects.Count > 0 ? pathObjects[pathObjects.Count - 1] : null;
+            if (job is JFSFile)
+            {
+                JFSFile fil = job as JFSFile;
+                Collection<byte> bytes = new Collection<byte>();
+                foreach (var item in content)
+                {
+                    string line = (item as string);
+                    if (line != null)
+                    {
+                        foreach (byte b in Encoding.UTF8.GetBytes(line))
+                        {
+                            bytes.Add(b);
+                        }
+                    }
+                }
+                byte[] rawBytes = new byte[bytes.Count];
+                bytes.CopyTo(rawBytes, 0);
+                fil.Write(rawBytes);
+            }
+            return null;
+        }
+
+        public void Seek(long offset, SeekOrigin origin)
+        {
+            if (origin == System.IO.SeekOrigin.Begin)
+            {
+                if (offset > 0)
+                {
+                    currentOffset = (ulong)(offset - 1);
+                }
+                else
+                {
+                    currentOffset = 0;
+                }
+            }
+            else if (origin == System.IO.SeekOrigin.End)
+            {
+                Collection<JFSObject> pathObjects = provider.GetPathObjects(path);
+                JFSObject job = pathObjects.Count > 0 ? pathObjects[pathObjects.Count - 1] : null;
+                if (job is JFSFile)
+                {
+                    JFSFile fil = job as JFSFile;
+                    if (fil.SizeInBytes <= 1)
+                    {
+                        currentOffset = 0;
+                    }
+                    else if (offset > 0)
+                    {
+                        if ((ulong)offset >= fil.SizeInBytes)
+                        {
+                            currentOffset = 0;
+                        }
+                        else
+                        {
+                            currentOffset = fil.SizeInBytes - 1 - (ulong)offset;
+                        }
+                    }
+                    else
+                    {
+                        currentOffset = 0;
+                    }
+                }
+                else
+                {
+                    currentOffset = 0;
+                }
+            }
+            else
+            {
+                if (offset < 0)
+                {
+                    if ((ulong)(-1*offset) >= currentOffset)
+                    {
+                        currentOffset = 0;
+                    }
+                    else
+                    {
+                        currentOffset += (ulong)offset;
+                    }
+                }
+                else
+                {
+                    currentOffset += (ulong)offset;
+                }
+            }
+        }
+        public void Close()
+        {
+            Dispose();
+        }
+        public void Dispose()
+        {
+            Seek(0, System.IO.SeekOrigin.Begin);
+            GC.SuppressFinalize(this);
+        }
+    }
+
+    #endregion
+
+
+    #endregion
 }
