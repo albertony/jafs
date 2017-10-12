@@ -12,6 +12,7 @@ namespace JaFS
     {
         private string name;
         public override string ToString() { return name; }
+        public static HttpMethod Head { get { return new HttpMethod() { name = "HEAD" }; } }
         public static HttpMethod Get { get { return new HttpMethod() { name = "GET" }; } }
         public static HttpMethod Post { get { return new HttpMethod() { name = "POST" }; } }
     }
@@ -29,9 +30,11 @@ namespace JaFS
         private const string JFS_BASE_URL_UPLOAD = "https://up.jottacloud.com/jfs";
         private const string JFS_DATE_FORMAT = "yyyy'-'MM'-'dd-'T'HH':'mm':'ssK"; // Similar to the standard round-trip ("O", "o") format, but without decimals. Jottacloud requires this format, or else it will just ignore it and use current date/time!
         public const string BUILTIN_DEVICE_NAME = "Jotta";
+        public string ClientMountRoot { get; set; } = ""; // Optional: Clients may set their own mount root representing where it is mounted for client specific behavior.
+        public string ClientMountPathSeparator { get; set; } = "\\"; // Optional: If mounted by client (ClientMountRoot!="") then client may also set its own path separator.
         public string ApiVersion { get { return "2.4"; } } // API version. Previously 2.2, against www.jottacloud.com, per 06.03.2017, same as in havardgulldahl/jottalib since October 2014.
         public string LibraryVersion { get { return System.Diagnostics.FileVersionInfo.GetVersionInfo(System.Reflection.Assembly.GetExecutingAssembly().Location).FileVersion; } }
-        private string RootName { get { return Credentials.UserName; } } // Cannot use Root.Name because the value here is needed for fetching that Root object!
+        public string RootName { get { return Credentials.UserName; } } // Cannot use Root.Name because the value here is needed for fetching that Root object!
         private NetworkCredential Credentials { get; set; }
         private ICollection<KeyValuePair<string, string>> RequestHeaders { get; }
         private JFSData.JFSUserData Data { get; set; }
@@ -171,6 +174,13 @@ namespace JaFS
                 throw new InvalidOperationException("You cannot delete the built-in device!");
             }
             DeleteDevicePermanently(device.Name);
+        }
+        public bool IsValidPath(string path)
+        {
+            string deviceName, mountPointName, theName;
+            string[] folderNames;
+            ParsePath(path, out deviceName, out mountPointName, out folderNames, out theName);
+            return !string.IsNullOrEmpty(deviceName);
         }
         public Collection<JFSObject> GetPathObjects(string path, bool includeDeleted = false)
         {
@@ -369,6 +379,20 @@ namespace JaFS
             }
             //request.Timeout = TODO?
             return request;
+        }
+        public System.Collections.Specialized.NameValueCollection RequestHead(string path, ICollection<KeyValuePair<string, string>> queryParameters = null, ICollection<KeyValuePair<string, string>> additionalHeaders = null)
+        {
+            // Make a GET request for url
+            Uri uri = CreateUri(path, queryParameters);
+            var request = CreateRequest(HttpMethod.Head, uri, additionalHeaders);
+            using (HttpWebResponse response = (HttpWebResponse)request.GetResponse())
+            {
+                if (response.StatusCode != HttpStatusCode.OK) //if (response.StatusCode >= HttpStatusCode.InternalServerError)
+                {
+                    throw new JFSError(response.StatusDescription);
+                }
+                return response.Headers;
+            }
         }
         public string RequestGet(string path, ICollection<KeyValuePair<string, string>> queryParameters = null, ICollection<KeyValuePair<string, string>> additionalHeaders = null)
         {
@@ -660,6 +684,43 @@ namespace JaFS
                 }
             }
         }
+        public JFSData.JFSFileData UploadSimple(string path, byte[] content, bool noHashVerification = false)
+        {
+            // Upload data to file, HTTP POST-ing to up.jottacloud.com, using the JottaCloud API.
+            long fileSize = content.Length;
+            // Configure url, query parameters  and request headers
+            var additionalHeaders = new Dictionary<string, string> { { "JSize", fileSize.ToString() } }; // Required header!
+            // Not supplying time stamps (JCreated and JModified headers), meaning the server will just register the current date time when it stores the file.
+            if (!noHashVerification)
+            {
+                // Calculate MD5 hash and put as header so that the server can verify it against received data.
+                // If not, the server will just accept whatever data we give it (as long as it matches the required header JSize), and it will return back the MD5 of it.
+                additionalHeaders.Add("JMd5", CalculateMD5(content));
+            }
+            var queryParameters = new Dictionary<string, string> { { "umode", "nomultipart" } };
+            Uri uri = CreateUri(path, queryParameters, forUpload: true);
+            var request = CreateRequest(HttpMethod.Post, uri, additionalHeaders);
+            //request.ContentType = "application/octet-stream";
+            request.ContentLength = fileSize;
+            // Write post data request
+            using (Stream requestStream = request.GetRequestStream())
+            {
+                requestStream.Write(content, 0, content.Length);
+            }
+            // Send request, and read response
+            using (HttpWebResponse response = (HttpWebResponse)request.GetResponse())
+            {
+                if (response.StatusCode != HttpStatusCode.Created)
+                {
+                    throw new JFSError(response.StatusDescription);
+                }
+                using (StreamReader reader = new StreamReader(response.GetResponseStream()))
+                {
+                    XmlSerializer serializer = new XmlSerializer(typeof(JFSData.JFSFileData));
+                    return (JFSData.JFSFileData)serializer.Deserialize(reader);
+                }
+            }
+        }
         public JFSData.JFSFileData UploadSimple(string path, FileInfo fileInfo, long offset = 0, bool noHashVerification = false, bool noFileTimes = false)
         {
             // Upload a fileobject to path, HTTP POST-ing to up.jottacloud.com, using the JottaCloud API.
@@ -893,6 +954,18 @@ namespace JaFS
     {
         protected Jottacloud FileSystem { get; }
         public JFSObject(Jottacloud fileSystem) { FileSystem = fileSystem; }
+        public virtual string ClientMountPath { get { return FileSystem.ClientMountRoot + ":"; } }
+        public override string ToString()
+        {
+            if (!String.IsNullOrEmpty(ClientMountPath))
+            {
+                return ClientMountPath;
+            }
+            else
+            {
+                return FileSystem.RootName;
+            }
+        }
     }
 
     //
@@ -913,6 +986,26 @@ namespace JaFS
         public virtual string ParentPath { get { return "/"; } protected set { return; } } // Pathless objects are assumed to be at top level.
         public string FullName { get { return ParentPath + Name; } } // Full path of this object. Never ending with path separator.
         protected virtual string CreateChildPath(string childName) { return FullName + "/" + childName; }
+        public override string ClientMountPath
+        {
+            get
+            {
+                if (String.IsNullOrEmpty(FileSystem.ClientMountRoot))
+                    return "";
+                return FileSystem.ClientMountRoot + ":" + FullName.Replace("/", FileSystem.ClientMountPathSeparator);
+            }
+        }
+        public override string ToString()
+        {
+            if (!String.IsNullOrEmpty(ClientMountPath))
+            {
+                return ClientMountPath;
+            }
+            else
+            {
+                return FullName;
+            }
+        }
 
         public JFSNamedObject(Jottacloud fileSystem, DataObjectType data, bool isCompleteData) : base(fileSystem)
         {
@@ -1403,6 +1496,16 @@ namespace JaFS
         {
             DeleteFilePermanently(file.Name);
         }
+        public virtual JFSBasicFile NewFile(string fileName, byte[] content)
+        {
+            // Create a new file in current folder and return the new JFSFile
+            string jfsPath = FullName + "/" + fileName;
+            var newFileData = FileSystem.UploadSimple(jfsPath, content); // Returns the new JFSFileData, which is not complete because it often misses the path element event!?
+            var fileObject = JFSBasicFile.Manufacture(FileSystem, FullName, newFileData);  // Cannot trust path being present in returned file data!
+            if (FileSystem.AutoFetchCompleteData)
+                FetchCompleteData(); // Re-load the current (parent) folder for the updated file to be considered (folders keep revision data about files)?
+            return fileObject;
+        }
         public virtual JFSBasicFile UploadFile(string filePath)
         {
             // Upload a file to current folder and return the new JFSFile
@@ -1567,7 +1670,6 @@ namespace JaFS
                 }
             }
         }
-
         public void Download(string localFolderPath, bool recurseSubfolders, bool skipIdenticalFiles, bool abortIfFolderExists, ref ulong numberOfFilesProcessed, ref ulong numberOfFilesDownloaded, Action<string> logMessageCallback)
         {
             Download(new DirectoryInfo(localFolderPath), recurseSubfolders, skipIdenticalFiles, abortIfFolderExists, ref numberOfFilesProcessed, ref numberOfFilesDownloaded, logMessageCallback);
@@ -2035,6 +2137,14 @@ namespace JaFS
             var parameters = new Dictionary<string, string> { { "mode", "bin" } };
             var additionalHeaders = new Dictionary<string, string> { { "Range", string.Format("bytes=%d-%d",from,to-1) } };
             return FileSystem.RequestGet(FullName, parameters, additionalHeaders);
+        }
+        public void Write(byte[] content)
+        {
+            FileSystem.UploadSimple(FullName, content);
+        }
+        public void Write(string content)
+        {
+            FileSystem.UploadSimple(FullName, Encoding.UTF8.GetBytes(content));
         }
         public void Stream(ulong chunk_size=64*1024)
         {
