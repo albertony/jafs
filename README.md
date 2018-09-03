@@ -1,15 +1,3 @@
-## * Notice *
-
-This project has not been maintained for a while, so use with care!
-
-Since then, Jottacloud have introduced a new API, referred to as the "Allocate API", which adds support for
-resume / de-duplication, OpenID, OAuth, 2FA, etc. This project is still based on the original api,
-the "JFS API". Both APIs are in use by Jottacloud official clients, for different parts of the functionality.
-I have not tested what works and what does not in the current state of this project.
-
-If you need a very good command line tool for accessing Jottacloud, and almost any other cloud storage provider, 
-I suggest you take a look at [rclone](https://rclone.org/)!
-
 JaFS
 ====
 
@@ -21,6 +9,61 @@ Jotta AS is a Norwegian company that operates under Norwegian jurisdiction, safe
 and with a [privacy guarantee](https://blog.jottacloud.com/its-your-stuff-guaranteed-3f50359f72d).
 This, together with their ulimited storage option, make them have an appealing offer in the crowded
 market of cloud service providers.
+
+Notice
+======
+
+This project was originally created back in 2017, and after getting it to a state where most of the features
+I needed was working, it did not get much attention in the years to follow - until september 2021.
+During this time Jottacloud slowly changed into token-based authentication (twice, actually - after the
+first version, they changed to the version currently in use). Whitelabel products changed even slower,
+some are not even using token-based
+authentication yet.
+
+In September 2021 I implemented basic support for token-based authentication. Usage example from PowerShell:
+- First you must login to the Web GUI, and generate a "Personal Login Token", direct url: https://www.jottacloud.com/web/secure. Save the result as a PowerShell string variable:
+    ```
+    $personalLoginToken = 'INSERT_HERE'
+    ```
+- Initialize a PowerShell session, same way as before:
+    ```
+    Add-Type -Path .\JottacloudFileSystem.dll
+    using namespace JaFS
+    ```
+- First time, create a token object from the personal login token, optionally save it into an **encrypted** file `Token.sec` for later re-use:
+    ```
+    $token = [Jottacloud]::CreateToken($personalLoginToken)
+    $token | ConvertTo-Json | ConvertTo-SecureString -AsPlainText -Force | ConvertFrom-SecureString | Out-File -LiteralPath 'Token.sec' -NoNewline
+    ```
+- Second and later times, read and decrypt token from the file, and re-fresh it:
+    ```
+    $oldToken = [TokenObject](New-Object -TypeName System.Net.NetworkCredential -ArgumentList '', (Get-Content -LiteralPath 'Token.sec' -Raw | ConvertTo-SecureString) | Select-Object -ExpandProperty Password | ConvertFrom-Json)
+    $token = [Jottacloud]::RefreshToken($oldToken)
+    ```
+- Initialize JaFS with token:
+    ```
+    $jafs = New-Object Jottacloud($token)
+    ```
+- From now on, everything is as before, e.g.:
+    ```
+    $jafs.AutoFetchCompleteData = $true
+    $mnt = $jafs.GetBuiltInDevice().GetMountPoint("Archive")
+    $mnt.GetFileTree()
+    ```
+
+Note:
+- The access token is valid in 1 hour, before you must use the Refresh method to replace it with a new one.
+- If the token expires, you will have to start over - generate a new personal login token from Web GUI etc.
+
+In addition to new authentication, Jottacloud have also introduced a new API for file uploads,
+referred to as the "Allocate API", which adds support for resume / de-duplication etc.
+This project is still based on the original api, the "JFS API". Both APIs are in use by Jottacloud
+official clients, for different parts of the functionality: JFS for basic navigation, Allocate for file uploads.
+I have not completely tested what works and what does not in the current state of this project.
+
+If you need a very good, maintained, command line tool for accessing Jottacloud,
+and almost any other cloud storage provider, I suggest you take a look at [rclone](https://rclone.org/)!
+
 
 Disclaimer
 ==========

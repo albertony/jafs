@@ -8,7 +8,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyDescription("JottacloudFileSystem (JaFS) library")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("JottacloudFileSystem")]
-[assembly: AssemblyCopyright("Copyright © 2017")]
+[assembly: AssemblyCopyright("Copyright © 2021")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

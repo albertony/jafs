@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Net;
 using System.Xml.Serialization;
 using JFSData;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
