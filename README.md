@@ -1,3 +1,13 @@
+## * Outated *
+
+This project has not been maintaned for a while! Since then Jottacloud have introduced a new API, referred to as the "Allocate API",
+which adds support for resume / de-duplication, OpenID, OAuth, 2FA, etc. This project is still based on the original api,
+the "JFS API". Both are still used officially by Jottacloud, for different operations, but I do not
+know what works and what does not in the current state. Maybe at some point I will get back to this project..
+
+If you need a very good command line tool for accessing Jottcloud, and almost any other cloud storage provider, 
+I suggest you take a look at [rclone](https://rclone.org/)!
+
 JaFS
 ====
 
@@ -48,7 +58,7 @@ Please add anything you find to the [bug tracker](https://github.com/albertony/j
 **White label products:**
 
 The REST API is shared with the various whitelabel products like [Get Sky](https://sky.get.no),
-[Elkjøp Cloud](https://cloud.elkjop.no) etc so this library should also work for them.
+[ElkjÃ¸p Cloud](https://cloud.elkjop.no) etc so this library should also work for them.
 Please let me know if you have tried on any such products, so I can gather a list of what
 works and what doesn't (just add a [issue](https://github.com/albertony/jafs/issues) or something).
 
