@@ -1,4 +1,4 @@
-## * Outated *
+## * Outdated *
 
 This project has not been maintaned for a while! Since then Jottacloud have introduced a new API, referred to as the "Allocate API",
 which adds support for resume / de-duplication, OpenID, OAuth, 2FA, etc. This project is still based on the original api,
