@@ -17,8 +17,6 @@ Jottacloud alternative File System (JaFS) is a C# library that wraps the HTTP RE
 available for the cloud storage service [Jottacloud](https://jottacloud.com) by the Norwegian
 company Jotta AS.
 
-[![Build status](https://ci.appveyor.com/api/projects/status/y6iv10oij43guxdf/branch/master?svg=true)](https://ci.appveyor.com/project/albertony/jafs/branch/master)
-
 Jotta AS is a Norwegian company that operates under Norwegian jurisdiction, safe from *USA PATRIOT Act*
 and with a [privacy guarantee](https://blog.jottacloud.com/its-your-stuff-guaranteed-3f50359f72d).
 This, together with their ulimited storage option, make them have an appealing offer in the crowded
