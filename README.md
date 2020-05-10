@@ -1,11 +1,13 @@
-## * Outdated *
+## * Notice *
 
-This project has not been maintaned for a while! Since then Jottacloud have introduced a new API, referred to as the "Allocate API",
-which adds support for resume / de-duplication, OpenID, OAuth, 2FA, etc. This project is still based on the original api,
-the "JFS API". Both are still used officially by Jottacloud, for different operations, but I do not
-know what works and what does not in the current state. Maybe at some point I will get back to this project..
+This project has not been maintained for a while, so use with care!
 
-If you need a very good command line tool for accessing Jottcloud, and almost any other cloud storage provider, 
+Since then, Jottacloud have introduced a new API, referred to as the "Allocate API", which adds support for
+resume / de-duplication, OpenID, OAuth, 2FA, etc. This project is still based on the original api,
+the "JFS API". Both APIs are in use by Jottacloud official clients, for different parts of the functionality.
+I have not tested what works and what does not in the current state of this project.
+
+If you need a very good command line tool for accessing Jottacloud, and almost any other cloud storage provider, 
 I suggest you take a look at [rclone](https://rclone.org/)!
 
 JaFS
