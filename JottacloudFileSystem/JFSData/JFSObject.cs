@@ -2,7 +2,7 @@
 using System.Globalization;
 using System.Xml.Serialization;
 
-namespace JFSData
+namespace Jottacloud.JFSData
 {
     //
     // Base class for all XML responses, containing attributes shared by all root elements.

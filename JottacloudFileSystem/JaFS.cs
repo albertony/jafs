@@ -1,36 +1,88 @@
-﻿using System;
+﻿//
+// Jottacloud alternative File System (JaFS)
+//
+// Wraps Jottacloud's XML-based HTTP REST API called "jfs".
+//
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Xml.Serialization;
 using System.Net;
 using System.Collections.ObjectModel;
+using Jottacloud.OAuthData;
+using System.Security.Cryptography;
 
-namespace JaFS
+namespace Jottacloud
 {
-    public sealed class HttpMethod // Minimalistic variant of System.Net.Http.HttpMethod, avoiding dependency to the System.Net.Http assembly.
-    {
-        private string name;
-        public override string ToString() { return name; }
-        public static HttpMethod Head { get { return new HttpMethod() { name = "HEAD" }; } }
-        public static HttpMethod Get { get { return new HttpMethod() { name = "GET" }; } }
-        public static HttpMethod Post { get { return new HttpMethod() { name = "POST" }; } }
-    }
 
-    public sealed class JaFS
+    // Helper class for OpenID Connect (OIDC) 1.0 (based on OAuth 2.0) authentication
+    public sealed class JFSToken
     {
-        public static string LibraryVersion { get { return System.Diagnostics.FileVersionInfo.GetVersionInfo(System.Reflection.Assembly.GetExecutingAssembly().Location).FileVersion; } }
-        public static string UserAgentString { get { return "JottacloudFileSystem version " + LibraryVersion; } }
+        private static byte[] EncryptionEntropy = { 108, 197, 89, 221, 62, 142, 207, 175, 61, 146 }; // Hard-coded entropy, just some random bytes!
+
+        internal TokenObject TokenObject { get; private set; } // If using the newest OpenID Connect (OIDC) 1.0 (based on OAuth 2.0) authentication
+        public JFSToken(TokenObject tokenObject)
+        {
+            TokenObject = tokenObject;
+        }
+        public static JFSToken CreateNew(string personalLoginToken)
+        {
+            var tokenObject = OAuthAPI.CreateToken(personalLoginToken);
+            return new JFSToken(tokenObject);
+        }
+        public static JFSToken ReadFromFile(string path, bool encrypted)
+        {
+            var tokenString = File.ReadAllText(path);
+            if (encrypted)
+            {
+                var encryptedData = Convert.FromBase64String(tokenString);
+                tokenString = DecryptString(encryptedData);
+            }
+            var tokenObject = OAuthAPI.ImportToken(tokenString);
+            return new JFSToken(tokenObject);
+        }
+        public void WriteToFile(string path, bool encrypt)
+        {
+            // Serialize the token object, encrypt it, and write to a file.
+            // The file will contain (encrypted) text. Could have written the byte data
+            // instead of converting it to string
+            var tokenString = OAuthAPI.ExportToken(TokenObject);
+            if (encrypt)
+            {
+                var encryptedData = EncryptString(tokenString);
+                tokenString = Convert.ToBase64String(encryptedData);
+            }
+            File.WriteAllText(path, tokenString);
+        }
+        public void Refresh()
+        {
+            // Assuming we have a refresh token, send a request to refresh the access token - and possibly also the refresh token.
+            TokenObject = OAuthAPI.RefreshToken(TokenObject);
+        }
+        private static byte[] EncryptString(string unencryptedString)
+        {
+            // Encrypt using the Data Protection API (DPAPI) built into Windows,
+            // using the current user's credentials.
+            return ProtectedData.Protect(Encoding.UTF8.GetBytes(unencryptedString), EncryptionEntropy, DataProtectionScope.CurrentUser);
+        }
+
+        private static string DecryptString(byte[] encryptedData)
+        {
+            // Decrypt using the Data Protection API (DPAPI) built into Windows,
+            // using the current user's credentials.
+            return Encoding.UTF8.GetString(ProtectedData.Unprotect(encryptedData, EncryptionEntropy, DataProtectionScope.CurrentUser));
+        }
     }
 
     //
     // Top level class for managing the Jottacloud File System.
-    // 
+    //
     // Keeps the JFSUserData object as the top level object, the root of the file system.
     // Paths in the data objects are relative starting with the username, but in our
     // wrapper library here we use paths within a single username only.
     //
-    public sealed class Jottacloud
+    public sealed class JFS
     {
         private const string JFS_BASE_URL = "https://jfs.jottacloud.com/jfs"; // Previously: "https://www.jottacloud.com/jfs"
         private const string JFS_BASE_URL_UPLOAD = "https://up.jottacloud.com/jfs";
@@ -40,7 +92,6 @@ namespace JaFS
         public string ClientMountPathSeparator { get; set; } = "\\"; // Optional: If mounted by client (ClientMountRoot!="") then client may also set its own path separator.
         public string ApiVersion { get { return "2.4"; } } // API version. Previously 2.2, against www.jottacloud.com, per 06.03.2017, same as in havardgulldahl/jottalib since October 2014.
         public string RootName { get; } // OLD: Only when using legacy password authentication: { get { return Credentials.UserName; } } // Cannot use Root.Name because the value here is needed for fetching that Root object!
-        private NetworkCredential Credentials { get; set; }
         private ICollection<KeyValuePair<string, string>> RequestHeaders { get; }
         private JFSData.JFSUserData Data { get; set; }
         public bool AutoFetchCompleteData { get; set; } = false; // If false (default) then user must call FetchCompleteData on objects for operations where it is needed. If set to true this is done automatically whenever needed.
@@ -61,105 +112,22 @@ namespace JaFS
         public ulong UsageBytes { get { return Data.Usage.Value; } }
         public string Usage { get { return Data.Usage.ToString(); } }
 
-        public TokenObject OAuthToken { get; } // If using the newest OpenID Connect (OIDC) 1.0 (based on OAuth 2.0) authentication
+        private NetworkCredential Credentials { get; } // If using legacy authentication
+        private JFSToken Token { get; } // If using the newest OpenID Connect (OIDC) 1.0 (based on OAuth 2.0) authentication
 
-        public static TokenObject CreateToken(string personalLoginToken)
+        public JFS(JFSToken token) // OpenID Connect (OIDC) 1.0 (based on OAuth 2.0) authentication
         {
-            // Personal Login Token must be generated by user at https://www.jottacloud.com/web/secure
-            var oauth = new JottacloudOAuth();
-            try
-            {
-                var token = oauth.CreateToken(personalLoginToken);
-                //return JottacloudOAuth.ExportToken(token); // Return it as json string
-                return token;
-            }
-            catch (WebException we)
-            {
-                HttpWebResponse response = (HttpWebResponse)we.Response;
-                /*
-                if (response.StatusCode == HttpStatusCode.Unauthorized)
-                {
-                    throw new UnauthorizedAccessException("Authorization with Jottacloud failed, please check that you are using the correct username and password, and try again!");
-                }
-                */
-                // If there is an error requesting token from the service, it will return response with
-                // HTTP 400 status code, and response content which is a JSON with key "error" with
-                // value "invalid_request", "invalid_client", "invalid_grant", "invalid_scope", "unauthorized_client",
-                // or "unsupported_grant_type", and optional key "error_description" with more descriptive message,
-                // and optional key "error_uri" with url to relevant documentation.
-                if (response.StatusCode == HttpStatusCode.BadRequest)
-                {
-                    /*
-                    using (Stream stream = response.GetResponseStream())
-                    {
-                        var serializer = new DataContractJsonSerializer(typeof(OpenidAuthenticationError));
-                        var errorObject (OpenidAuthenticationError)serializer.ReadObject(stream);
-                    }
-                    */
-                    using (Stream stream = response.GetResponseStream())
-                    using (var reader = new StreamReader(stream))
-                    {
-                        string text = reader.ReadToEnd();
-                        throw new Exception("New access token request was invalid\n" + text);
-                    }
-                }
-                throw;
-            }
-        }
-
-        public static TokenObject RefreshToken(TokenObject tokenObject)
-        {
-            //var old_token = JottacloudOAuth.ImportToken(tokenJson);
-            var oauth = new JottacloudOAuth();
-            try
-            {
-                var newTokenObject = oauth.RefreshToken(tokenObject);
-                //return JottacloudOAuth.ExportToken(new_token); // Return it as json string
-                return newTokenObject;
-            }
-            catch (WebException we)
-            {
-                HttpWebResponse response = (HttpWebResponse)we.Response;
-                /*
-                if (response.StatusCode == HttpStatusCode.Unauthorized)
-                {
-                    throw new UnauthorizedAccessException("Authorization with Jottacloud failed, please check that you are using the correct username and password, and try again!");
-                }
-                */
-                // If there is an error requesting token from the service, it will return response with
-                // HTTP 400 status code, and response content which is a JSON with key "error" with
-                // value "invalid_request", "invalid_client", "invalid_grant", "invalid_scope", "unauthorized_client",
-                // or "unsupported_grant_type", and optional key "error_description" with more descriptive message,
-                // and optional key "error_uri" with url to relevant documentation.
-                if (response.StatusCode == HttpStatusCode.BadRequest)
-                {
-                    using (Stream stream = response.GetResponseStream())
-                    using (var reader = new StreamReader(stream))
-                    {
-                        string text = reader.ReadToEnd();
-                        throw new Exception("Token refresh request was invalid\n" + text);
-                    }
-                }
-                throw;
-            }
-        }
-
-        public Jottacloud(TokenObject token) // OAuth
-        {
-            //OAuthToken = JottacloudOAuth.ImportToken(tokenJson);
-            OAuthToken = token;
+            Token = token;
             RequestHeaders = new Dictionary<string, string>() {
-                //{ "X-JottaAPIVersion", ApiVersion } // Old header name used with API version 2.2, against www.jottacloud.com, per 06.03.2017, same as in havardgulldahl/jottalib since October 2014. github.com/paaland/node-jfs does not use it, but github.com/havardgulldahl/jottalib do!
-                //{ "x-jftp-version", ApiVersion } // New header name used for API version 2.4. Not required..
-                { "Authorization", "Bearer " + OAuthToken.AccessToken }
+                { "Authorization", "Bearer " + Token.TokenObject.AccessToken }
             };
-            // CustomerInfo is a separate request from the JFS API, so we can don't have to supply username,
-            // as long as we have a valid token we can retrieve it (Username is internal numeric value, but there is also Name
-            // with is more like a friendlyname? And email!)
-            var oauth = new JottacloudOAuth();
             try
             {
-                var customerInfo = oauth.GetCustomerInfo(OAuthToken);
+                // We need the username - it is the root level in the JFS structure,
+                // but with just the token we have no username. Instead of requiring user
+                // to supply it we send a CustomerInfo request: It is not within the JFS API,
+                // i.e. not relying on a username in the url, and we only need the token.
+                var customerInfo = CustomerInfoAPI.GetCustomerInfo(Token.TokenObject);
                 RootName = customerInfo.Username;
                 FetchDataObject();
             }
@@ -173,7 +141,7 @@ namespace JaFS
                 throw;
             }
         }
-        public Jottacloud(NetworkCredential credentials) // Legacy auth
+        public JFS(NetworkCredential credentials) // Legacy authentication
         {
             Credentials = credentials;
             RequestHeaders = new Dictionary<string, string>() {
@@ -194,7 +162,7 @@ namespace JaFS
                 throw;
             }
         }
-        public Jottacloud(string username, string password) : this(new NetworkCredential(username, password)) { } // Legacy auth
+        public JFS(string username, string password) : this(new NetworkCredential(username, password)) { } // Legacy authentication
         public void Refresh()
         {
             FetchDataObject();
@@ -486,7 +454,7 @@ namespace JaFS
             }
             //request.ContentType = contentType;
             request.KeepAlive = false;
-            request.UserAgent = JaFS.UserAgentString;
+            request.UserAgent = API.UserAgentString;
             foreach (var kv in RequestHeaders)
             {
                 request.Headers.Add(kv.Key, kv.Value);
@@ -1073,8 +1041,8 @@ namespace JaFS
 
     public abstract class JFSObject
     {
-        protected Jottacloud FileSystem { get; }
-        public JFSObject(Jottacloud fileSystem) { FileSystem = fileSystem; }
+        protected JFS FileSystem { get; }
+        public JFSObject(JFS fileSystem) { FileSystem = fileSystem; }
         public virtual string ClientMountPath { get { return FileSystem.ClientMountRoot + ":"; } }
         public override string ToString()
         {
@@ -1128,7 +1096,7 @@ namespace JaFS
             }
         }
 
-        public JFSNamedObject(Jottacloud fileSystem, DataObjectType data, bool isCompleteData) : base(fileSystem)
+        public JFSNamedObject(JFS fileSystem, DataObjectType data, bool isCompleteData) : base(fileSystem)
         {
             SetData(data, isCompleteData);
         }
@@ -1177,12 +1145,12 @@ namespace JaFS
                 ParentPath = FileSystem.ConvertFromDataPath(Data.Path) + "/";
             }
         }
-        public JFSNamedAndPathedObject(Jottacloud fileSystem, DataObjectType dataWithpath, bool isCompleteData)
+        public JFSNamedAndPathedObject(JFS fileSystem, DataObjectType dataWithpath, bool isCompleteData)
             : base(fileSystem, dataWithpath, isCompleteData)
         {
             ParentPath = FileSystem.ConvertFromDataPath(Data.Path) + "/";
         }
-        public JFSNamedAndPathedObject(Jottacloud fileSystem, string parentFullName, DataObjectType incompleteDataWithoutPath)
+        public JFSNamedAndPathedObject(JFS fileSystem, string parentFullName, DataObjectType incompleteDataWithoutPath)
             : base(fileSystem, incompleteDataWithoutPath, false)
         {
             ParentPath = parentFullName + "/"; // Since incomplete data it usually does not contain path yet.
@@ -1196,7 +1164,7 @@ namespace JaFS
     {
         public string DisplayName { get { return Data.DisplayNameData.String; } }
         public JFSData.JFSDataDeviceType Type { get { return Data.Type; } }
-        public bool IsBuiltInDevice { get { return Name == Jottacloud.BUILTIN_DEVICE_NAME || Type == JFSData.JFSDataDeviceType.BuiltIn; } } // Testing both name and type, just to be on the safe side..
+        public bool IsBuiltInDevice { get { return Name == JFS.BUILTIN_DEVICE_NAME || Type == JFSData.JFSDataDeviceType.BuiltIn; } } // Testing both name and type, just to be on the safe side..
         public Guid ID { get { return Data.SID.Guid; } }
         public DateTime? Modified { get { return Data.Modified.DateTime; } }
         public ulong SizeInBytes { get { return Data.Size.Value; } }
@@ -1234,7 +1202,7 @@ namespace JaFS
                 return counter;
             }
         }
-        public JFSDevice(Jottacloud fileSystem, JFSData.JFSDeviceData data, bool isCompleteData) : base(fileSystem, data, isCompleteData) {}
+        public JFSDevice(JFS fileSystem, JFSData.JFSDeviceData data, bool isCompleteData) : base(fileSystem, data, isCompleteData) {}
         public void DeletePermanently()
         {
             throw new InvalidOperationException("Permanent deletion must be done from the parent object!");
@@ -1392,8 +1360,8 @@ namespace JaFS
         public ulong NumberOfFolders { get { return Data.Metadata != null ? Data.Metadata.NumberOfFolders : 0; } }
         public ulong NumberOfFiles { get { return Data.Metadata != null ? Data.Metadata.NumberOfFiles : 0; } }
 
-        public JFSBasicFolder(Jottacloud fileSystem, DataObjectType dataWithPath, bool isCompleteData) : base(fileSystem, dataWithPath, isCompleteData) { }
-        public JFSBasicFolder(Jottacloud fileSystem, string parentFullName, DataObjectType incompleteDataWithoutPath) : base(fileSystem, parentFullName, incompleteDataWithoutPath) { }
+        public JFSBasicFolder(JFS fileSystem, DataObjectType dataWithPath, bool isCompleteData) : base(fileSystem, dataWithPath, isCompleteData) { }
+        public JFSBasicFolder(JFS fileSystem, string parentFullName, DataObjectType incompleteDataWithoutPath) : base(fileSystem, parentFullName, incompleteDataWithoutPath) { }
         public string[] GetFileNames(bool includeDeleted = false)
         {
             // Deleted files that are still in the trash are not returned by default, but argument includeDeleted can be used to include them.
@@ -1819,8 +1787,8 @@ namespace JaFS
         public DateTime? Modified { get { if (Data.Modified != null) return Data.Modified.DateTime; return null; } }
         public string DeviceName { get { return Data.Device; } } // Only in complete data
         public string UserName { get { return Data.User; } } // Only in complete data
-        public JFSMountPoint(Jottacloud fileSystem, JFSData.JFSMountPointData dataWithPath, bool isCompleteData) : base(fileSystem, dataWithPath, isCompleteData) {}
-        public JFSMountPoint(Jottacloud fileSystem, string parentFullName, JFSData.JFSMountPointData incompleteDataWithoutPath) : base(fileSystem, parentFullName, incompleteDataWithoutPath) { }
+        public JFSMountPoint(JFS fileSystem, JFSData.JFSMountPointData dataWithPath, bool isCompleteData) : base(fileSystem, dataWithPath, isCompleteData) {}
+        public JFSMountPoint(JFS fileSystem, string parentFullName, JFSData.JFSMountPointData incompleteDataWithoutPath) : base(fileSystem, parentFullName, incompleteDataWithoutPath) { }
         public override void Delete()
         {
             // Delete this mount point and return a deleted JFSMountPoint.
@@ -1844,7 +1812,7 @@ namespace JaFS
     //
     public sealed class JFSTrash : JFSNamedAndPathedObject<JFSData.JFSMountPointData>
     {
-        public JFSTrash(Jottacloud fileSystem, JFSData.JFSMountPointData completeData) : base(fileSystem, completeData, true) {} // Since trash is not listed on device, we always have to fetch it directly - and then data is always complete!
+        public JFSTrash(JFS fileSystem, JFSData.JFSMountPointData completeData) : base(fileSystem, completeData, true) {} // Since trash is not listed on device, we always have to fetch it directly - and then data is always complete!
         public JFSBasicFile[] GetFiles()
         {
             CheckCompleteData();
@@ -1948,8 +1916,8 @@ namespace JaFS
     public sealed class JFSFolder : JFSBasicFolder<JFSData.JFSFolderData>
     {
         public bool IsDeleted { get { return Data.Deleted != null; } }
-        public JFSFolder(Jottacloud fileSystem, JFSData.JFSFolderData dataWithPath, bool isCompleteData) : base(fileSystem, dataWithPath, isCompleteData) { }
-        public JFSFolder(Jottacloud fileSystem, string parentFullName, JFSData.JFSFolderData incompleteDataWithoutPath) : base(fileSystem, parentFullName, incompleteDataWithoutPath) { }
+        public JFSFolder(JFS fileSystem, JFSData.JFSFolderData dataWithPath, bool isCompleteData) : base(fileSystem, dataWithPath, isCompleteData) { }
+        public JFSFolder(JFS fileSystem, string parentFullName, JFSData.JFSFolderData incompleteDataWithoutPath) : base(fileSystem, parentFullName, incompleteDataWithoutPath) { }
         public void Move(string newPath)
         {
             // Move/rename folder to a new name, possibly a whole new path - creating any intermediate folders along the way.
@@ -2005,8 +1973,8 @@ namespace JaFS
         public Guid ID { get { return Data.UUID; } }
         public virtual bool IsValid { get { return Data.CurrentRevision != null; } } // If it is a JFSBasicFile then it has the potential to become a valid JFSFile if is has a valid version. But it might also have a have newer incomplete or corrupt version.
         protected override string CreateChildPath(string childName) { throw new InvalidOperationException(); } // Not supported for files!
-        public JFSBasicFile(Jottacloud fileSystem, JFSData.JFSFileData dataWithPath, bool isCompleteData) : base(fileSystem, dataWithPath, isCompleteData) { }
-        public JFSBasicFile(Jottacloud fileSystem, string parentFullName, JFSData.JFSFileData incompleteDataWithoutPath) : base(fileSystem, parentFullName, incompleteDataWithoutPath) { }
+        public JFSBasicFile(JFS fileSystem, JFSData.JFSFileData dataWithPath, bool isCompleteData) : base(fileSystem, dataWithPath, isCompleteData) { }
+        public JFSBasicFile(JFS fileSystem, string parentFullName, JFSData.JFSFileData incompleteDataWithoutPath) : base(fileSystem, parentFullName, incompleteDataWithoutPath) { }
         public static bool NewestVersionIsCompleted(JFSData.JFSFileData data)
         {
             // Used for checking upload success.
@@ -2017,7 +1985,7 @@ namespace JaFS
             return data.LatestRevision == null && data.CurrentRevision != null && data.CurrentRevision.State == JFSData.JFSDataFileState.Completed;
         }
 
-        public static JFSBasicFile Manufacture(Jottacloud fileSystem, string parentFullName, JFSData.JFSFileData data)
+        public static JFSBasicFile Manufacture(JFS fileSystem, string parentFullName, JFSData.JFSFileData data)
         {
             // Class method to get the correct file class instantiated
             if (data.CurrentRevision != null)
@@ -2031,7 +1999,7 @@ namespace JaFS
                 return ManufactureFromLatestVersion(fileSystem, parentFullName, data);
             }
         }
-        public static JFSBasicFile Manufacture(Jottacloud fileSystem, JFSData.JFSFileData dataWithPath, bool isCompleteData)
+        public static JFSBasicFile Manufacture(JFS fileSystem, JFSData.JFSFileData dataWithPath, bool isCompleteData)
         {
             // Class method to get the correct file class instantiated
             if (dataWithPath.CurrentRevision != null)
@@ -2045,15 +2013,15 @@ namespace JaFS
                 return ManufactureFromLatestVersion(fileSystem, dataWithPath, isCompleteData);
             }
         }
-        protected static JFSFile ManufactureFromCurrentVersion(Jottacloud fileSystem, JFSData.JFSFileData dataWithPath, bool isCompleteData)
+        protected static JFSFile ManufactureFromCurrentVersion(JFS fileSystem, JFSData.JFSFileData dataWithPath, bool isCompleteData)
         {
             return new JFSFile(fileSystem, dataWithPath, isCompleteData);
         }
-        protected static JFSFile ManufactureFromCurrentVersion(Jottacloud fileSystem, string parentFullName, JFSData.JFSFileData data)
+        protected static JFSFile ManufactureFromCurrentVersion(JFS fileSystem, string parentFullName, JFSData.JFSFileData data)
         {
             return new JFSFile(fileSystem, parentFullName, data);
         }
-        protected static JFSCorruptFile ManufactureFromLatestVersion(Jottacloud fileSystem, JFSData.JFSFileData dataWithPath, bool isCompleteData)
+        protected static JFSCorruptFile ManufactureFromLatestVersion(JFS fileSystem, JFSData.JFSFileData dataWithPath, bool isCompleteData)
         {
             if (dataWithPath.LatestRevision != null)
             {
@@ -2075,7 +2043,7 @@ namespace JaFS
                 throw new NotImplementedException("Missing revision for JFSFile. Please file a bug!");
             }
         }
-        protected static JFSCorruptFile ManufactureFromLatestVersion(Jottacloud fileSystem, string parentFullName, JFSData.JFSFileData data)
+        protected static JFSCorruptFile ManufactureFromLatestVersion(JFS fileSystem, string parentFullName, JFSData.JFSFileData data)
         {
             if (data.LatestRevision != null)
             {
@@ -2117,7 +2085,7 @@ namespace JaFS
         {
             // Check if the specified local file is matching the current version on server.
             FileInfo fileInfo = new FileInfo(filePath);
-            string md5Hash = Jottacloud.CalculateMD5(fileInfo);
+            string md5Hash = JFS.CalculateMD5(fileInfo);
             return VerifyRemote(fileInfo, md5Hash);
         }
         public JFSBasicFile VerifyRemote(string filePath, string md5Hash)
@@ -2178,10 +2146,10 @@ namespace JaFS
         public bool HasOlderValidVersion { get { return Data.CurrentRevision != null; } }
         public JFSFile GetValidVersion() { return HasOlderValidVersion ? ManufactureFromCurrentVersion(FileSystem, Data, CompleteData) : null; }
         public JFSFile GetOldVersion(int steps = 1) { throw new NotImplementedException(); }
-        public JFSCorruptFile(Jottacloud fileSystem, JFSData.JFSFileData dataWithPath, bool isCompleteData) : base(fileSystem, dataWithPath, isCompleteData) { }
-        public JFSCorruptFile(Jottacloud fileSystem, string parentFullName, JFSData.JFSFileData incompleteDataWithoutPath) : base(fileSystem, parentFullName, incompleteDataWithoutPath) {}
+        public JFSCorruptFile(JFS fileSystem, JFSData.JFSFileData dataWithPath, bool isCompleteData) : base(fileSystem, dataWithPath, isCompleteData) { }
+        public JFSCorruptFile(JFS fileSystem, string parentFullName, JFSData.JFSFileData incompleteDataWithoutPath) : base(fileSystem, parentFullName, incompleteDataWithoutPath) {}
         public bool VerifyLocal(string filePath) { return VerifyLocal(new FileInfo(filePath)); } // Check if the specified local file is matching the current item (not checking upstream).
-        public bool VerifyLocal(FileInfo fileInfo) { return MD5 != null && Jottacloud.CalculateMD5(fileInfo) == MD5; } // Check if the specified local file is matching the current item (not checking upstream).
+        public bool VerifyLocal(FileInfo fileInfo) { return MD5 != null && JFS.CalculateMD5(fileInfo) == MD5; } // Check if the specified local file is matching the current item (not checking upstream).
         protected JFSBasicFile VerifyRemoteExistingHash(FileInfo fileInfo) { if (MD5 == null) throw new InvalidOperationException("MD5 hash missing for current file item!"); return VerifyRemote(fileInfo, MD5); }
         private JFSBasicFile VerifyRemoteExistingHash(string filePath) { return VerifyRemoteExistingHash(new FileInfo(filePath)); }
     }
@@ -2196,8 +2164,8 @@ namespace JaFS
     {
         public virtual ulong SizeInBytes { get { return Data.LatestRevision.Size.Value; } } // Bytes uploaded of the file so far. Note that we only have the file size if the file was requested directly, not if it's part of a folder listing.
         public virtual string Size { get { return Data.LatestRevision.Size.ToString(); } }
-        public JFSIncompleteFile(Jottacloud fileSystem, JFSData.JFSFileData dataWithPath, bool isCompleteData) : base(fileSystem, dataWithPath, isCompleteData) { }
-        public JFSIncompleteFile(Jottacloud fileSystem, string parentFullName, JFSData.JFSFileData incompleteDataWithoutPath) : base(fileSystem, parentFullName, incompleteDataWithoutPath) { }
+        public JFSIncompleteFile(JFS fileSystem, JFSData.JFSFileData dataWithPath, bool isCompleteData) : base(fileSystem, dataWithPath, isCompleteData) { }
+        public JFSIncompleteFile(JFS fileSystem, string parentFullName, JFSData.JFSFileData incompleteDataWithoutPath) : base(fileSystem, parentFullName, incompleteDataWithoutPath) { }
         public JFSBasicFile ResumeUpload(string filePath)
         {
             if (!CompleteData)
@@ -2242,8 +2210,8 @@ namespace JaFS
         public override bool IsValid { get { return true; } } // If it is a JFSFile then it is by definition a valid file.
         public bool HasNewerInvalidVersion { get { return Data.LatestRevision != null; } } // Meaning incomplete or corrupt!
         public JFSCorruptFile GetLatestVersion() { return HasNewerInvalidVersion ? ManufactureFromLatestVersion(FileSystem, Data, CompleteData) : null; }
-        public JFSFile(Jottacloud fileSystem, JFSData.JFSFileData dataWithPath, bool isCompleteData) : base(fileSystem, dataWithPath, isCompleteData) { }
-        public JFSFile(Jottacloud fileSystem, string parentFullName, JFSData.JFSFileData incompleteDataWithoutPath) : base(fileSystem, parentFullName, incompleteDataWithoutPath) { }
+        public JFSFile(JFS fileSystem, JFSData.JFSFileData dataWithPath, bool isCompleteData) : base(fileSystem, dataWithPath, isCompleteData) { }
+        public JFSFile(JFS fileSystem, string parentFullName, JFSData.JFSFileData incompleteDataWithoutPath) : base(fileSystem, parentFullName, incompleteDataWithoutPath) { }
         public string Read()
         {
             // Reading the file content by requesting the file url with parameter "mode=bin"
@@ -2421,8 +2389,8 @@ namespace JaFS
     {
         public override string Name { get { return "Latest"; } } // Special case: No name in data object!
         public override string ParentPath { get; } // Special case: No path in data object!
-        public JFSEnableSharing(Jottacloud fileSystem, JFSData.JFSEnableSharingData data, bool completeData) : base(fileSystem, parentPath, data, null) {}
-        public JFSEnableSharing(Jottacloud fileSystem, string name) : base(fileSystem, name, null) {}
+        public JFSEnableSharing(JFS fileSystem, JFSData.JFSEnableSharingData data, bool completeData) : base(fileSystem, parentPath, data, null) {}
+        public JFSEnableSharing(JFS fileSystem, string name) : base(fileSystem, name, null) {}
         // TODO:
         //public JFSFileData[] GetFiles()
     }

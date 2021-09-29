@@ -7,7 +7,7 @@
     <ProjectGuid>{EDCD0380-5C21-4160-87FE-A3A33E8ED699}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>JaFS</RootNamespace>
+    <RootNamespace>Jottacloud</RootNamespace>
     <AssemblyName>JottacloudFileSystem</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
@@ -35,9 +35,14 @@
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Data" />
     <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.Security" />
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="API.cs" />
+    <Compile Include="HttpMethod.cs" />
+    <Compile Include="CustomerInfoAPI.cs" />
+    <Compile Include="JsonAPI.cs" />
     <Compile Include="JaFS.cs" />
     <Compile Include="JFSData\JFSDevice.cs" />
     <Compile Include="JFSData\JFSEnableSharing.cs" />
@@ -48,7 +53,8 @@
     <Compile Include="JFSData\JFSObject.cs" />
     <Compile Include="JFSData\JFSSearchResult.cs" />
     <Compile Include="JFSData\JFSUser.cs" />
-    <Compile Include="OAuth.cs" />
+    <Compile Include="OAuthData.cs" />
+    <Compile Include="OAuthAPI.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

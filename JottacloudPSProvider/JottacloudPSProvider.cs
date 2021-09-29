@@ -1,12 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Text;
-using System.Threading.Tasks;
-
 using System.Management.Automation;
 using System.Management.Automation.Provider;
 using System.Collections.ObjectModel;
-using JaFS;
 using System.Net;
 using System.IO;
 using System.Collections;
@@ -15,7 +11,7 @@ using System.Collections;
 //
 // New-PSDrive -Name JAFS -PSProvider JottacloudPSProvider -Root . -Credential (Get-Credential)
 //
-namespace JottacloudPSProvider
+namespace Jottacloud.JottacloudPSProvider
 {
     #region Provider class (JottacloudPSProvider)
 
@@ -46,10 +42,10 @@ namespace JottacloudPSProvider
             {
                 // Create a new drive and create an ODBC connection to the new drive.
                 jedi = new JottacloudPSDriveInfo(drive);
-                Jottacloud jafs = new Jottacloud((NetworkCredential)drive.Credential);
-                jafs.ClientMountRoot = jedi.Name;
-                jafs.ClientMountPathSeparator = PSPathSeparator;
-                jedi.JAFS = jafs;
+                JFS jfs = new JFS((NetworkCredential)drive.Credential);
+                jfs.ClientMountRoot = jedi.Name;
+                jfs.ClientMountPathSeparator = PSPathSeparator;
+                jedi.FileSystem = jfs;
             }
             return jedi;
         }
@@ -64,7 +60,7 @@ namespace JottacloudPSProvider
             }
             else
             {
-                // Close the JAFS connection to the drive.
+                // Close the JFS connection to the drive.
                 jedi = drive as JottacloudPSDriveInfo;
                 if (jedi == null)
                 {
@@ -73,7 +69,7 @@ namespace JottacloudPSProvider
                 }
                 else
                 {
-                    //jedi.JAFS.Close();  // TODO: Currently no persistant connection!
+                    //jedi.JFS.Close();  // TODO: Currently no persistant connection!
                     return jedi;
                 }
             }
@@ -94,7 +90,7 @@ namespace JottacloudPSProvider
             }
             else
             {
-                Collection<JFSObject> pathObjects = JAFS.GetPathObjects(JAFSPath(path));
+                Collection<JFSObject> pathObjects = FileSystem.GetPathObjects(JFSPath(path));
                 JFSObject job = pathObjects.Count > 0 ? pathObjects[pathObjects.Count - 1] : null;
                 bool isContainer = !(job is JFSBasicFile);
                 WriteItemObject(job, path, isContainer);
@@ -111,7 +107,7 @@ namespace JottacloudPSProvider
             }
             else
             {
-                return JAFS.IsValidPath(path);
+                return FileSystem.IsValidPath(path);
             }
         }
         protected override bool ItemExists(string path)
@@ -125,7 +121,7 @@ namespace JottacloudPSProvider
                 JFSObject job = null;
                 try
                 {
-                    Collection<JFSObject> pathObjects = JAFS.GetPathObjects(JAFSPath(path));
+                    Collection<JFSObject> pathObjects = FileSystem.GetPathObjects(JFSPath(path));
                     if (pathObjects.Count > 0)
                     {
                         job = pathObjects[pathObjects.Count - 1];
@@ -133,7 +129,7 @@ namespace JottacloudPSProvider
                 }
                 catch (ArgumentException)
                 {
-                    // Expecting JAFS.GetPathObjects to throw for path that does not exist, which is normal.
+                    // Expecting JFS.GetPathObjects to throw for path that does not exist, which is normal.
                 }
                 return job != null;
             }
@@ -156,14 +152,14 @@ namespace JottacloudPSProvider
         {
             if (PathIsDrive(path))
             {
-                foreach (var deviceName in JAFS.GetDeviceNames())
+                foreach (var deviceName in FileSystem.GetDeviceNames())
                 {
                     WriteItemObject(deviceName, path, true);
                 }
             }
             else
             {
-                Collection<JFSObject> pathObjects = JAFS.GetPathObjects(JAFSPath(path));
+                Collection<JFSObject> pathObjects = FileSystem.GetPathObjects(JFSPath(path));
                 JFSObject job = pathObjects.Count > 0 ? pathObjects[pathObjects.Count - 1] : null;
                 if (job is JFSDevice)
                 {
@@ -220,7 +216,7 @@ namespace JottacloudPSProvider
             {
                 return true;
             }
-            Collection<JFSObject> pathObjects = JAFS.GetPathObjects(JAFSPath(path));
+            Collection<JFSObject> pathObjects = FileSystem.GetPathObjects(JFSPath(path));
             JFSObject job = pathObjects.Count > 0 ? pathObjects[pathObjects.Count - 1] : null;
             if (job != null)
             {
@@ -271,7 +267,7 @@ namespace JottacloudPSProvider
                 {
                     if (ShouldProcess(itemName, "New device"))
                     {
-                        WriteItemObject(JAFS.NewDevice(itemName, parameters.DeviceType), path + PSPathSeparator + itemName, true);
+                        WriteItemObject(FileSystem.NewDevice(itemName, parameters.DeviceType), path + PSPathSeparator + itemName, true);
                     }
                 }
                 else
@@ -283,7 +279,7 @@ namespace JottacloudPSProvider
             {
                 if (!PathIsDrive(path))
                 {
-                    Collection<JFSObject> pathObjects = JAFS.GetPathObjects(JAFSPath(path));
+                    Collection<JFSObject> pathObjects = FileSystem.GetPathObjects(JFSPath(path));
                     JFSDevice dev = pathObjects.Count > 0 ? pathObjects[pathObjects.Count - 1] as JFSDevice : null;
                     if (dev != null)
                     {
@@ -306,7 +302,7 @@ namespace JottacloudPSProvider
             {
                 if (!PathIsDrive(path))
                 {
-                    Collection<JFSObject> pathObjects = JAFS.GetPathObjects(JAFSPath(path));
+                    Collection<JFSObject> pathObjects = FileSystem.GetPathObjects(JFSPath(path));
                     JFSObject job = pathObjects.Count > 0 ? pathObjects[pathObjects.Count - 1] : null;
                     if (job is JFSMountPoint)
                     {
@@ -345,7 +341,7 @@ namespace JottacloudPSProvider
             {
                 if (!PathIsDrive(path))
                 {
-                    Collection<JFSObject> pathObjects = JAFS.GetPathObjects(JAFSPath(path));
+                    Collection<JFSObject> pathObjects = FileSystem.GetPathObjects(JFSPath(path));
                     JFSObject job = pathObjects.Count > 0 ? pathObjects[pathObjects.Count - 1] : null;
                     if (job is JFSMountPoint)
                     {
@@ -398,7 +394,7 @@ namespace JottacloudPSProvider
             {
                 throw new ArgumentException("Remove not supported for this item");
             }
-            Collection<JFSObject> pathObjects = JAFS.GetPathObjects(JAFSPath(path));
+            Collection<JFSObject> pathObjects = FileSystem.GetPathObjects(JFSPath(path));
             JFSObject job = pathObjects.Count > 0 ? pathObjects[pathObjects.Count - 1] : null;
             if (job is JFSDevice)
             {
@@ -407,7 +403,7 @@ namespace JottacloudPSProvider
                 {
                     if (ShouldProcess(path, "RemoveItem"))
                     {
-                        JAFS.DeleteDevicePermanently(dev);
+                        FileSystem.DeleteDevicePermanently(dev);
                     }
                 }
                 else
@@ -531,7 +527,7 @@ namespace JottacloudPSProvider
             {
                 WriteItemObject(this.PSDriveInfo, path, true);
             }
-            Collection<JFSObject> pathObjects = JAFS.GetPathObjects(JAFSPath(path));
+            Collection<JFSObject> pathObjects = FileSystem.GetPathObjects(JFSPath(path));
             JFSObject job = pathObjects.Count > 0 ? pathObjects[pathObjects.Count - 1] : null;
             if (job is JFSFolder)
             {
@@ -571,7 +567,7 @@ namespace JottacloudPSProvider
             {
                 return true;
             }
-            Collection<JFSObject> pathObjects = JAFS.GetPathObjects(JAFSPath(path));
+            Collection<JFSObject> pathObjects = FileSystem.GetPathObjects(JFSPath(path));
             JFSObject job = pathObjects.Count > 0 ? pathObjects[pathObjects.Count - 1] : null;
             return job != null && !(job is JFSBasicFile);
         }
@@ -583,7 +579,7 @@ namespace JottacloudPSProvider
             {
                 WriteItemObject(this.PSDriveInfo, path, true);
             }
-            Collection<JFSObject> pathObjects = JAFS.GetPathObjects(JAFSPath(path));
+            Collection<JFSObject> pathObjects = FileSystem.GetPathObjects(JFSPath(path));
             JFSObject job = pathObjects.Count > 0 ? pathObjects[pathObjects.Count - 1] : null;
             if (job is JFSFolder)
             {
@@ -591,7 +587,7 @@ namespace JottacloudPSProvider
                 if (ShouldProcess(path, "MoveItem"))
                 {
                     WriteItemObject(fol, path, false);
-                    fol.Move(JAFSPath(destination));
+                    fol.Move(JFSPath(destination));
                 }
             }
             else if (job is JFSFile)
@@ -600,7 +596,7 @@ namespace JottacloudPSProvider
                 if (ShouldProcess(path, "MoveItem"))
                 {
                     WriteItemObject(fil, path, false);
-                    fil.Move(JAFSPath(destination));
+                    fil.Move(JFSPath(destination));
                 }
             }
             else
@@ -648,7 +644,7 @@ namespace JottacloudPSProvider
 
         #region Helper Methods
 
-        private Jottacloud JAFS
+        private JFS FileSystem
         {
             get
             {
@@ -659,19 +655,19 @@ namespace JottacloudPSProvider
                 }
                 else
                 {
-                    return jedi.JAFS;
+                    return jedi.FileSystem;
                 }
             }
         }
 
         // Adapts the path, making sure the correct path separator
-        private string JAFSPath(string path)
+        private string JFSPath(string path)
         {
             string result = path;
 
             if (!String.IsNullOrEmpty(path))
             {
-                result = path.Replace(PSPathSeparator, JAFSPathSeparator);
+                result = path.Replace(PSPathSeparator, JFSPathSeparator);
             }
             return result;
         }
@@ -687,13 +683,13 @@ namespace JottacloudPSProvider
 
         public Collection<JFSObject> GetPathObjects(string path)
         {
-            return JAFS.GetPathObjects(JAFSPath(path));
+            return FileSystem.GetPathObjects(JFSPath(path));
         }
 
         #region Private Properties
 
         private string PSPathSeparator = "\\";
-        private string JAFSPathSeparator = "/"; // JAFS uses forward slashes, mapping them directly to REST API URLs
+        private string JFSPathSeparator = "/"; // JFS uses forward slashes, mapping them directly to REST API URLs
 
         #endregion Private Properties
 
@@ -709,14 +705,14 @@ namespace JottacloudPSProvider
 
     internal class JottacloudPSDriveInfo : PSDriveInfo
     {
-        Jottacloud jafs;
+        JFS jfs;
         public JottacloudPSDriveInfo(PSDriveInfo driveInfo) : base(driveInfo)
         {
         }
-        public Jottacloud JAFS
+        public JFS FileSystem
         {
-            get { return this.jafs; }
-            set { this.jafs = value; }
+            get { return this.jfs; }
+            set { this.jfs = value; }
         }
     }
 

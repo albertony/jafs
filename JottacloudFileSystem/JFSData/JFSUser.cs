@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Xml.Serialization;
 
-namespace JFSData
+namespace Jottacloud.JFSData
 {
     //
     // Wrapping the XML response from query "https://www.jotta.no/jfs/[username]",

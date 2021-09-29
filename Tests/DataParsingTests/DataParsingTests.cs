@@ -1,11 +1,9 @@
-﻿using System;
-using System.IO;
-using System.Net;
+﻿using System.IO;
 using System.Xml.Serialization;
-using JFSData;
+using Jottacloud.JFSData;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
-namespace DataParsingTests
+namespace Jottacloud.DataParsingTests
 {
     [TestClass]
     public class DataParsingTests

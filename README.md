@@ -28,21 +28,21 @@ In September 2021 I implemented basic support for token-based authentication. Us
 - Initialize a PowerShell session, same way as before:
     ```
     Add-Type -Path .\JottacloudFileSystem.dll
-    using namespace JaFS
+    using namespace Jottacloud
     ```
-- First time, create a token object from the personal login token, optionally save it into an **encrypted** file `Token.sec` for later re-use:
+- First time, create a token object from the personal login token, optionally save it into a personal **encrypted** file `Token.sec` for later re-use:
     ```
-    $token = [Jottacloud]::CreateToken($personalLoginToken)
-    $token | ConvertTo-Json | ConvertTo-SecureString -AsPlainText -Force | ConvertFrom-SecureString | Out-File -LiteralPath 'Token.sec' -NoNewline
+    $token = [JFSToken]::CreateNew($personalLoginToken)
+    $token.WriteToFile("Token.sec", $true)
     ```
 - Second and later times, read and decrypt token from the file, and re-fresh it:
     ```
-    $oldToken = [TokenObject](New-Object -TypeName System.Net.NetworkCredential -ArgumentList '', (Get-Content -LiteralPath 'Token.sec' -Raw | ConvertTo-SecureString) | Select-Object -ExpandProperty Password | ConvertFrom-Json)
-    $token = [Jottacloud]::RefreshToken($oldToken)
+    $token =  [JFSToken]::ReadFromFile("Token.sec", $true)
+    $token.Refresh()
     ```
-- Initialize JaFS with token:
+- Initialize JFS with the token:
     ```
-    $jafs = New-Object Jottacloud($token)
+    $jafs = New-Object JFS($token)
     ```
 - From now on, everything is as before, e.g.:
     ```
@@ -52,8 +52,10 @@ In September 2021 I implemented basic support for token-based authentication. Us
     ```
 
 Note:
-- The access token is valid in 1 hour, before you must use the Refresh method to replace it with a new one.
-- If the token expires, you will have to start over - generate a new personal login token from Web GUI etc.
+- The PowerShell Provider has not been extended with support for tokens.
+- The access token is valid in 1 hour, before you must use the Refresh method to fetch an new one.
+- If the refresh token expires, unknown how long that takes, you will have to start over: Generate
+  a new personal login token from Web GUI etc.
 
 In addition to new authentication, Jottacloud have also introduced a new API for file uploads,
 referred to as the "Allocate API", which adds support for resume / de-duplication etc.
@@ -125,8 +127,8 @@ or newer you can execute `using namespace JaFS`
 Example for PowerShell 5:
 ```
 Add-Type -Path .\JottacloudFileSystem.dll
-using namespace JaFS
-$jafs = New-Object Jottacloud((Get-Credential).GetNetworkCredential())
+using namespace Jottacloud
+$jafs = New-Object JFS((Get-Credential).GetNetworkCredential())
 $jafs.AutoFetchCompleteData = $true
 $mnt = $jafs.GetBuiltInDevice().GetMountPoint("Archive")
 $mnt.GetFileTree()
