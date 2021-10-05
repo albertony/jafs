@@ -23,10 +23,10 @@ namespace Jottacloud.JottacloudPSProvider
         //protected override Collection<PSDriveInfo> InitializeDefaultDrives()
         protected override PSDriveInfo NewDrive(PSDriveInfo drive)
         {
-            JottacloudPSDriveInfo jedi = null;
             if (drive == null)
             {
                 WriteError(new ErrorRecord(new ArgumentNullException("drive"), "NullDrive", ErrorCategory.InvalidArgument, null));
+                return null;
             }
             // Check if the drive root is not null or empty and if it is valid.
             /*else if (String.IsNullOrEmpty(drive.Root))
@@ -34,19 +34,35 @@ namespace Jottacloud.JottacloudPSProvider
                 WriteError(new ErrorRecord(new ArgumentException("drive.Root"), "NoRoot", ErrorCategory.InvalidArgument, drive));
                 return null;
             }*/
-            else if (drive.Credential == null)
+            var tokenFile = Environment.GetEnvironmentVariable("JOTTACLOUD_TOKEN_FILE_ENCRYPTED");
+            var tokenFileIsEncrypted = true;
+            if (tokenFile == null)
             {
-                WriteError(new ErrorRecord(new ArgumentNullException("drive.Credential"), "NoCredential", ErrorCategory.InvalidArgument, drive));
+                tokenFile = Environment.GetEnvironmentVariable("JOTTACLOUD_TOKEN_FILE");
+                tokenFileIsEncrypted = false;
+            }
+            JFS jfs;
+            if (tokenFile != null)
+            {
+                var token = JFSToken.ReadFromFile(tokenFile, tokenFileIsEncrypted);
+                token.Refresh();
+                jfs = new JFS(token);
             }
             else
             {
-                // Create a new drive and create an ODBC connection to the new drive.
-                jedi = new JottacloudPSDriveInfo(drive);
-                JFS jfs = new JFS((NetworkCredential)drive.Credential);
-                jfs.ClientMountRoot = jedi.Name;
-                jfs.ClientMountPathSeparator = PSPathSeparator;
-                jedi.FileSystem = jfs;
+                if (drive.Credential == null)
+                {
+                    WriteError(new ErrorRecord(new ArgumentNullException("drive.Credential"), "NoCredential", ErrorCategory.InvalidArgument, drive));
+                    return null;
+                }
+                jfs = new JFS((NetworkCredential)drive.Credential);
             }
+
+            // Create a new drive and create an ODBC connection to the new drive.
+            var jedi = new JottacloudPSDriveInfo(drive);
+            jfs.ClientMountRoot = jedi.Name;
+            jfs.ClientMountPathSeparator = PSPathSeparator;
+            jedi.FileSystem = jfs;
             return jedi;
         }
         //protected override object NewDriveDynamicParameters();

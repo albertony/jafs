@@ -10,49 +10,69 @@ and with a [privacy guarantee](https://blog.jottacloud.com/its-your-stuff-guaran
 This, together with their ulimited storage option, make them have an appealing offer in the crowded
 market of cloud service providers.
 
-Notice
-======
+Update September 2021
+=====================
 
 This project was originally created back in 2017, and after getting it to a state where most of the features
 I needed was working, it did not get much attention in the years to follow - until september 2021.
 During this time Jottacloud slowly changed into token-based authentication (twice, actually - after the
 first version, they changed to the version currently in use). Whitelabel products changed even slower,
-some are not even using token-based
-authentication yet.
+some are not even using token-based authentication yet.
 
-In September 2021 I implemented basic support for token-based authentication. Usage example from PowerShell:
-- First you must login to the Web GUI, and generate a "Personal Login Token", direct url: https://www.jottacloud.com/web/secure. Save the result as a PowerShell string variable:
-    ```
-    $personalLoginToken = 'INSERT_HERE'
-    ```
-- Initialize a PowerShell session, same way as before:
+Starting in September 2021 I implemented basic support for token-based authentication. The following
+section describes these changes, while the rest of this readme contains details from the original
+implementation (most of it, except that related to authentication, is still valid):
+
+Usage example from PowerShell:
+1) Initialize a PowerShell session, same way as before:
     ```
     Add-Type -Path .\JottacloudFileSystem.dll
     using namespace Jottacloud
     ```
-- First time, create a token object from the personal login token, optionally save it into a personal **encrypted** file `Token.sec` for later re-use:
-    ```
-    $token = [JFSToken]::CreateNew($personalLoginToken)
-    $token.WriteToFile("Token.sec", $true)
-    ```
-- Second and later times, read and decrypt token from the file, and re-fresh it:
-    ```
-    $token =  [JFSToken]::ReadFromFile("Token.sec", $true)
-    $token.Refresh()
-    ```
-- Initialize JFS with the token:
+2) Get token object, one of two alternatives:
+    - a) Either, first time, creating a new token:
+        - i) First you must login to the Web GUI, and generate a "Personal Login Token", direct url: https://www.jottacloud.com/web/secure. Save the result as a PowerShell string variable:
+           ```
+           $personalLoginToken = 'INSERT_HERE'
+           ```
+        - ii) Create a token object from the personal login token, optionally save it into a personal **encrypted** file `Token.sec` for later re-use:
+            ```
+            $token = [JFSToken]::CreateNew($personalLoginToken)
+            $token.WriteToFile("Token.sec", $true)
+            ```
+    - b) Or, second and later times, read and decrypt existing token from the file, and re-fresh it:
+        ```
+        $token =  [JFSToken]::ReadFromFile("Token.sec", $true)
+        $token.Refresh()
+        ```
+3) Initialize JFS with the token:
     ```
     $jafs = New-Object JFS($token)
     ```
-- From now on, everything is as before, e.g.:
+4) From now on, everything is as before, e.g.:
     ```
     $jafs.AutoFetchCompleteData = $true
     $mnt = $jafs.GetBuiltInDevice().GetMountPoint("Archive")
     $mnt.GetFileTree()
     ```
 
+The PowershellProvider can also be used with tokens, but its a bit more quirky: The token *must* be stored in file,
+and path to the file must be set as environment variable `JOTTACLOUD_TOKEN_FILE_ENCRYPTED` (if encrypted)
+or `JOTTACLOUD_TOKEN_FILE` (if unencrypted). Token will be loaded from file, and will always be refreshed.
+1) Repeat steps `1` and `2a` above to create a file containing a token.
+2) Store path to the token file in environment variable
+    ```
+    $Env:JOTTACLOUD_TOKEN_FILE_ENCRYPTED = 'Token.sec'
+    ```
+3) Load Powershell drive as before, without setting -Credential option of New-PSDrive:
+    ```
+    [Reflection.Assembly]::LoadFrom("JottacloudPSProvider.dll") | Import-Module
+    New-PSDrive -Name JAFS -PSProvider JottacloudPSProvider -Root \
+    Test-Path JAFS:\PC001
+    Get-Item JAFS:\PC001\Backup
+    ```
+
 Note:
-- The PowerShell Provider has not been extended with support for tokens.
 - The access token is valid in 1 hour, before you must use the Refresh method to fetch an new one.
 - If the refresh token expires, unknown how long that takes, you will have to start over: Generate
   a new personal login token from Web GUI etc.
