@@ -16,7 +16,7 @@ namespace Jottacloud.OAuthData
         // more descriptive message, and optional key "error_uri" with url to relevant documentation.
         [DataMember(Name = "error")] public string Code { get; set; }
         [DataMember(Name = "error_description")] public string Description { get; set; }
-        [DataMember(Name = "error_uri")] public string uri { get; set; }
+        [DataMember(Name = "error_uri")] public string Uri { get; set; }
     }
 
     [DataContract]

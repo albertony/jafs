@@ -80,44 +80,31 @@ namespace Jottacloud
             // Create new token.
             // Input argument must be a Personal Login Token, base64 encoded json string,
             // generated interactively by user from Web GUI at https://www.jottacloud.com/web/secure.
+            LoginToken loginToken;
             try
             {
-                var loginToken = ParseLoginToken(PersonalLoginToken);
-                var openidConfiguration = RequestOpenidConfiguration(loginToken);
-                var token = RequestNewToken(loginToken, openidConfiguration);
-                return token;
+                loginToken = ParseLoginToken(PersonalLoginToken);
             }
-            catch (WebException we)
+            catch
             {
-                HttpWebResponse response = (HttpWebResponse)we.Response;
-                /*
-                if (response.StatusCode == HttpStatusCode.Unauthorized)
-                {
-                    throw new UnauthorizedAccessException("Authorization with Jottacloud failed, please check that you are using the correct username and password, and try again!");
-                }
-                */
-                // If there is an error requesting token from the service, it will return response with
-                // HTTP 400 status code, and response content which is a JSON with key "error" with
-                // value "invalid_request", "invalid_client", "invalid_grant", "invalid_scope", "unauthorized_client",
-                // or "unsupported_grant_type", and optional key "error_description" with more descriptive message,
-                // and optional key "error_uri" with url to relevant documentation.
-                if (response.StatusCode == HttpStatusCode.BadRequest)
-                {
-                    /*
-                    using (Stream stream = response.GetResponseStream())
-                    {
-                        var serializer = new DataContractJsonSerializer(typeof(OpenidAuthenticationError));
-                        var errorObject (OpenidAuthenticationError)serializer.ReadObject(stream);
-                    }
-                    */
-                    using (Stream stream = response.GetResponseStream())
-                    using (var reader = new StreamReader(stream))
-                    {
-                        string text = reader.ReadToEnd();
-                        throw new Exception("New access token request was invalid\n" + text);
-                    }
-                }
-                throw;
+                throw new ArgumentException("Value is not a valid Personal Login Token");
+            }
+            OpenidConfiguration openidConfiguration;
+            try
+            {
+                openidConfiguration = RequestOpenidConfiguration(loginToken);
+            }
+            catch
+            {
+                throw new Exception("Request for OpenID Configuration using supplied login token failed");
+            }
+            try
+            {
+                return RequestNewToken(loginToken, openidConfiguration);
+            }
+            catch (WebException webException)
+            {
+                throw OAuthException.CreateFromWebException(webException, "Request for new token failed");
             }
         }
 
@@ -126,33 +113,11 @@ namespace Jottacloud
             // Refresh existing token.
             try
             {
-                var newToken = RequestTokenRefresh(token);
-                return newToken;
+                return RequestTokenRefresh(token);
             }
-            catch (WebException we)
+            catch (WebException webException)
             {
-                HttpWebResponse response = (HttpWebResponse)we.Response;
-                /*
-                if (response.StatusCode == HttpStatusCode.Unauthorized)
-                {
-                    throw new UnauthorizedAccessException("Authorization with Jottacloud failed, please check that you are using the correct username and password, and try again!");
-                }
-                */
-                // If there is an error requesting token from the service, it will return response with
-                // HTTP 400 status code, and response content which is a JSON with key "error" with
-                // value "invalid_request", "invalid_client", "invalid_grant", "invalid_scope", "unauthorized_client",
-                // or "unsupported_grant_type", and optional key "error_description" with more descriptive message,
-                // and optional key "error_uri" with url to relevant documentation.
-                if (response.StatusCode == HttpStatusCode.BadRequest)
-                {
-                    using (Stream stream = response.GetResponseStream())
-                    using (var reader = new StreamReader(stream))
-                    {
-                        string text = reader.ReadToEnd();
-                        throw new Exception("Token refresh request was invalid\n" + text);
-                    }
-                }
-                throw;
+                throw OAuthException.CreateFromWebException(webException, "Request for token refresh failed");
             }
         }
 
@@ -171,12 +136,107 @@ namespace Jottacloud
         public static TokenObject ImportToken(string tokenString)
         {
             // Import token from JSON string, in the same format as the OpenID Connect API uses (lowercase member names with underscore).
-            using (var memoryStream = new MemoryStream(Encoding.UTF8.GetBytes(tokenString)))
+            try
             {
-                var serializer = new DataContractJsonSerializer(typeof(TokenObject));
-                return (TokenObject)serializer.ReadObject(memoryStream);
+                using (var memoryStream = new MemoryStream(Encoding.UTF8.GetBytes(tokenString)))
+                {
+                    var serializer = new DataContractJsonSerializer(typeof(TokenObject));
+                    return (TokenObject)serializer.ReadObject(memoryStream);
+                }
+            }
+            catch
+            {
+                throw new ArgumentException("Value is not a valid token object");
             }
         }
+    }
 
+    public class OAuthException : Exception
+    {
+        public OAuthException(string message) : base(message) { }
+        public static OAuthException CreateFromWebException(WebException webException, string message = null)
+        {
+            if (string.IsNullOrEmpty(message))
+            {
+                message = webException.Message;
+            }
+            HttpWebResponse response = (HttpWebResponse)webException.Response;
+            if (response.StatusCode == HttpStatusCode.BadRequest)
+            {
+                return new OAuthBadRequestException(message, response);
+            }
+            else if (response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                //throw new UnauthorizedAccessException("Authorization with Jottacloud failed, please check that you are using the correct username and password, and try again!");
+                return new OAuthUnauthorizedException(message);
+            }
+            else
+            {
+                return new OAuthException(message);
+            }
+        }
+    }
+
+    public class OAuthUnauthorizedException : OAuthException
+    {
+        public OAuthUnauthorizedException(string message) : base(message) {}
+    }
+
+    public class OAuthBadRequestException : OAuthException
+    {
+        public OpenidAuthenticationError OAuthResponseObject { get; }
+        public string OAuthResponseString { get; }
+        public OAuthBadRequestException(string message, OpenidAuthenticationError errorObject) : base(message)
+        {
+            OAuthResponseObject = errorObject;
+        }
+        public OAuthBadRequestException(string message, HttpWebResponse response) : base(message)
+        {
+            try
+            {
+                // If there is an error requesting token from the service, it will return response with
+                // HTTP 400 status code, and response content which is a JSON with key "error" with
+                // value "invalid_request", "invalid_client", "invalid_grant", "invalid_scope", "unauthorized_client",
+                // or "unsupported_grant_type", and optional key "error_description" with more descriptive message,
+                // and optional key "error_uri" with url to relevant documentation.
+                if (response.StatusCode == HttpStatusCode.BadRequest)
+                {
+                    using (Stream stream = response.GetResponseStream())
+                    {
+                        var serializer = new DataContractJsonSerializer(typeof(OpenidAuthenticationError));
+                        OAuthResponseObject = (OpenidAuthenticationError)serializer.ReadObject(stream);
+                    }
+                }
+                else
+                {
+                    using (Stream stream = response.GetResponseStream())
+                    using (var reader = new StreamReader(stream))
+                    {
+                        OAuthResponseString = reader.ReadToEnd();
+                    }
+                }
+            }
+            catch
+            {
+                OAuthResponseString = "Failed to parse OAuth response";
+            }
+        }
+        public override string ToString()
+        {
+            string result = Message;
+            if (OAuthResponseObject != null)
+            {
+                result += $" ({OAuthResponseObject.Code}: {OAuthResponseObject.Description})";
+            }
+            else if (!string.IsNullOrEmpty(OAuthResponseString))
+            {
+                result += $" ({OAuthResponseString})";
+            }
+            else
+            {
+                result += " (OAuth bad request)";
+            }
+            return result;
+        }
     }
 }

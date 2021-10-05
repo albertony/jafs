@@ -20,16 +20,26 @@ namespace Jottacloud
     public sealed class JFSToken
     {
         private static byte[] EncryptionEntropy = { 108, 197, 89, 221, 62, 142, 207, 175, 61, 146 }; // Hard-coded entropy, just some random bytes!
-
-        internal TokenObject TokenObject { get; private set; } // If using the newest OpenID Connect (OIDC) 1.0 (based on OAuth 2.0) authentication
-        public JFSToken(TokenObject tokenObject)
+        public TokenObject TokenObject { get; private set; } // If using the newest OpenID Connect (OIDC) 1.0 (based on OAuth 2.0) authentication
+        public DateTimeOffset Timestamp { get; private set; }
+        public TimeSpan Expires
+        {
+            get
+            {
+                var seconds = TokenObject.ExpiresIn - (DateTimeOffset.UtcNow - Timestamp).TotalSeconds;
+                return seconds > 0 ? TimeSpan.FromSeconds(seconds) : new TimeSpan();
+            }
+        }
+        public JFSToken(TokenObject tokenObject) : this(tokenObject, DateTimeOffset.MinValue) {}
+        public JFSToken(TokenObject tokenObject, DateTimeOffset timestamp)
         {
             TokenObject = tokenObject;
+            Timestamp = timestamp;
         }
         public static JFSToken CreateNew(string personalLoginToken)
         {
             var tokenObject = OAuthAPI.CreateToken(personalLoginToken);
-            return new JFSToken(tokenObject);
+            return new JFSToken(tokenObject, DateTimeOffset.UtcNow);
         }
         public static JFSToken ReadFromFile(string path, bool encrypted)
         {
@@ -59,6 +69,7 @@ namespace Jottacloud
         {
             // Assuming we have a refresh token, send a request to refresh the access token - and possibly also the refresh token.
             TokenObject = OAuthAPI.RefreshToken(TokenObject);
+            Timestamp = DateTimeOffset.UtcNow;
         }
         private static byte[] EncryptString(string unencryptedString)
         {
