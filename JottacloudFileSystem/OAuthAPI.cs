@@ -20,11 +20,15 @@ namespace Jottacloud
 
         private static LoginToken ParseLoginToken(string loginTokenString)
         {
-            // Parse Personal Login Token, which is a base64 encoded json string,
-            // generated interactively by user in Web GUI at https://www.jottacloud.com/web/secure.
-            //var tokenBytes = Convert.FromBase64String(base64Token);
-            //var tokenObject = Encoding.UTF8.GetString(tokenBytes);
-            using (var stream = new MemoryStream(Convert.FromBase64String(loginTokenString)))
+            // Parse Personal Login Token, generated interactively by user in Web GUI at
+            // https://www.jottacloud.com/web/secure.
+            // This is a JSON string encoded as raw base64url, i.e. using the alternate
+            // URL- and filesystem-safe alphabet which substitutes '-' instead of '+'
+            // and '_' instead of '/' in the standard Base64 alphabet, and without padding.
+            // The Convert.FromBase64String assumes standard base64 encoding, with padding,
+            // so we must convert manually.
+            var tokenBytes = Convert.FromBase64String(loginTokenString.PadRight(loginTokenString.Length + loginTokenString.Length * 3 % 4, '=').Replace("-", "+").Replace("_", "/"));
+            using (var stream = new MemoryStream(tokenBytes))
             {
                 var serializer = new DataContractJsonSerializer(typeof(LoginToken));
                 return (LoginToken)serializer.ReadObject(stream);
@@ -78,7 +82,7 @@ namespace Jottacloud
         public static TokenObject CreateToken(string PersonalLoginToken)
         {
             // Create new token.
-            // Input argument must be a Personal Login Token, base64 encoded json string,
+            // Input argument must be a Personal Login Token, json string encoded as raw base64url,
             // generated interactively by user from Web GUI at https://www.jottacloud.com/web/secure.
             LoginToken loginToken;
             try
