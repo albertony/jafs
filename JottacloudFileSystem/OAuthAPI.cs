@@ -16,7 +16,7 @@ namespace Jottacloud
     public class OAuthAPI
     {
         private const string CLIENT_ID = "jottacli";
-        private const string SCOPE = "offline_access+openid";
+        private const string SCOPE = "openid offline_access";
 
         private static LoginToken ParseLoginToken(string loginTokenString)
         {
