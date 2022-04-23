@@ -97,7 +97,7 @@ namespace Jottacloud
     {
         private const string JFS_BASE_URL = "https://jfs.jottacloud.com/jfs"; // Previously: "https://www.jottacloud.com/jfs"
         private const string JFS_BASE_URL_UPLOAD = "https://up.jottacloud.com/jfs";
-        private const string JFS_DATE_FORMAT = "yyyy'-'MM'-'dd-'T'HH':'mm':'ssK"; // Similar to the standard round-trip ("O", "o") format, but without decimals. Jottacloud requires this format, or else it will just ignore it and use current date/time!
+        private const string JFS_DATE_FORMAT = "yyyy'-'MM'-'dd'-T'HH':'mm':'ssK"; // Similar to the standard round-trip ("O", "o") format, but with an additional '-' in front of 'T', and without decimals. Jottacloud uses this format in output, and previously required it for input but seem to also accept more standard formats now (it will just ignore any incorrect formats and use current date/time instead)!
         public const string BUILTIN_DEVICE_NAME = "Jotta";
         public string ClientMountRoot { get; set; } = ""; // Optional: Clients may set their own mount root representing where it is mounted for client specific behavior.
         public string ClientMountPathSeparator { get; set; } = "\\"; // Optional: If mounted by client (ClientMountRoot!="") then client may also set its own path separator.
